@@ -1,0 +1,29 @@
+--------------------
+--- Translations ---
+--------------------
+
+--- Ocarina of Time (Spanish) ---
+http://dorando.emuverse.com/projects/eduardo_a2j/zelda-ocarina-of-time.html
+
+--- Ocarina of Time (Polish) ---
+AndriejSiergiej / Berov
+
+
+
+-------------------------------------
+--- GameCube to N64 patches (USA) ---
+-------------------------------------
+
+--- Ocarina of Time / Master Quest (ozidual) ---
+http://krikzz.com/forum/index.php?topic=5281.0
+
+--- Majora's Mask (Aroenai) ---
+https://krikzz.com/forum/index.php?topic=5161.0
+
+
+
+----------------------------------
+--- Credits Fix (Master Quest) ---
+----------------------------------
+
+GhostlyDark
