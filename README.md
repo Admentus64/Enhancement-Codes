@@ -7,12 +7,12 @@ Mods for GameCube / Wii emulator Dolphin
 
 Texture Pack (Zelda 64 for GC and Wii VC):
 
-https://forums.dolphin-emu.org/Thread-zelda-64-uhd-v4-1-2020-01-22
+https://forums.dolphin-emu.org/Thread-zelda-64-uhd-v4-3-2020-05-02
 
 
 Texture pack (Super Mario 64 for Wii VC):
 
-https://forums.dolphin-emu.org/Thread-super-mario-64-hd-texture-pack-v1-7-2019-11-08
+https://forums.dolphin-emu.org/Thread-super-mario-64-hd-texture-pack-v1-7-1-2020-03-16
 
 
 Texture pack (Super Smash Bros. 64 for Wii VC):
@@ -38,6 +38,10 @@ AR Codes for Texture Pack Projects:
 https://forums.dolphin-emu.org/Thread-ar-coding-with-admentus
 
 
+Discord:
+
+http://discord.gg/P22GGzz
+
 
 --- Download Links ---
 
@@ -59,6 +63,7 @@ https://mega.nz/#F!6uxUCY5J!4vMXh8hG_AZcu_tMRuOtVQ
 OneDrive:
 
 https://1drv.ms/u/s!Aii8tQNUbVimlRgWBBIlDqZNzPpF
+
 
 Dropbox:
 
