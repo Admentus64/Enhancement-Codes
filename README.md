@@ -37,6 +37,11 @@ AR Codes for Texture Pack Projects:
 
 https://forums.dolphin-emu.org/Thread-ar-coding-with-admentus
 
+Virtual Console - USA WAD Patcher:
+
+https://forums.dolphin-emu.org/Thread-virtual-console-usa-wad-patcher-22-05-2020?pid=507385#pid507385
+
+
 
 Discord:
 
