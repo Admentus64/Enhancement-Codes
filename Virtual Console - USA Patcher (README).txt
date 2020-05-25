@@ -134,7 +134,7 @@ Bighead (Custom Texture Tool and Initial Virtual Console Patcher)
 Admentus (Mods Assemblage, Coding & Testing)
 GhostlyDark (Testing & Assistance)
 
---- Ocarina of Time: Redux (ROM Hack) ---
+--- Ocarina of Time REDUX (ROM Hack) ---
 Maroc
 ShadowOne
 MattKimura
@@ -147,9 +147,18 @@ rlbond86
 KevilPal
 junglechief
 
---- Majora's Mask: Redux (ROM Hack) ---
+--- Majora's Mask REDUX (ROM Hack) ---
 Maroc
 Saneki
+
+--- Majora's Mask: Masked Quest (ROM Hack) ---
+- Garo-Mastah
+- Aroenai
+- CloudMax
+- fkualol
+- VictorHale
+- Ideka
+- Saneki
 
 --- Dawn & Dusk (ROM Hack) ---
 Captain Seedy-Eye (Lead Development, Music & Testing)
