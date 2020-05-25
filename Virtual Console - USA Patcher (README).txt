@@ -1,11 +1,12 @@
 Virtual Console - VC WAD Patcher
-22-05-2020
 
 Patches the USA Virtual Console Ocarina of Time, Majora's Mask, Super Mario 64 or Paper Mario with the following:
 
-- Custom injection (OoT, MM & SM64)
+- Custom injection (OoT, MM, SM64 & PP)
 - Redux romhack (OoT & MM)
+- Dawn & Dusk romhack (OoT)
 - The Fate of the Bombiwa romhack (OoT)
+- Masked Quest romhack (MM)
 - Spanish Translation patch (OoT)
 - Polish Translation patch (OoT & MM)
 - Chinese Translation patch (OoT)
@@ -17,6 +18,20 @@ Patches the USA Virtual Console Ocarina of Time, Majora's Mask, Super Mario 64 o
 - Hard Mode romhack (PP)
 - Hard Mode+ romhack (PP)
 - Insane Mode romhack (PP)
+
+It is also possible to:
+
+- Inject a custom ROM into the VC WAD
+- Patch the ROM contained within the VC WAD with a custom BPS/IPS patch file
+- Only patch the VC WAD with the chosen selected modifications
+- Extract the ROM contained within the VC WAD only
+- Change to Free Mode so that any of the four options listed above can applied to any VC WAD titles
+
+Keep in mind that:
+
+a) Patching Majora's Mask or Paper Mario requires their respective modes and not Free Mode, since both VC WAD titles have applied specific compression to their rom and boot dol.
+
+b) Free Mode likely will not work on anything other than Nintendo 64 titles for the Virtual Console
 
 
 
@@ -47,6 +62,20 @@ Patches the USA Virtual Console Ocarina of Time, Majora's Mask, Super Mario 64 o
 
 
 
+====================================
+=== VC PATCH OPTIONS DESCRIPTION ===
+====================================
+
+- Remove All T64		Remove all injected custom textures by the Virtual Console in the .T64 format
+- Expand Memory			Expand the available RAM memory, but invalidates existing AR/Gecko codes
+- Remap D-Pad			Remap the D-Pad to their four D-Pad button directions instead of toggling the minimap
+- Downgrade			Downgrade Ocarina of Time from US 1.2 (default in VC WAD) to US 1.0
+- Remap C-Down			Remap C-Down to toggle the minimap button
+- Remap Z			Remap Z, ZL and ZR to toggle the minimap
+- Leave D-Pad Up		Keep D-Pad for toggling the minimap
+
+
+
 =======================================
 === OCARINA OF TIME / MAJORA'S MASK ===
 =======================================
@@ -55,9 +84,7 @@ Patches the USA Virtual Console Ocarina of Time, Majora's Mask, Super Mario 64 o
 
 - Patched games do not work with existing AR/Gecko codes, except for Dawn & Dusk.
 
-- Enable optional checkboxes to remap the D-Pad to their actual D-Pad button instead of the minimap, expand the memory from 4MB to 8MB for Ocarina of Time or apply the 12MB Fix for Majora's Mask. Both Redux patches automaticially force the Remap D-Pad (OoT and MM) and Expand Mememory (OoT) checkboxes.
-
-- Enabling the Expand Memory (OoT) or 12MB Fix (MM) checkboxes renders existing AR/Gecko Codes unusable.
+- Enable optional checkboxes to remap the D-Pad to their actual D-Pad button instead of the minimap, expand the memory by 4MB for Ocarina of Time and Majora's Mask. Both Redux patches automaticially force the Remap D-Pad (OoT and MM) and Expand Memory (OoT) checkboxes. Masked Quest also forces the Remap D-Pad checkbox.
 
 
 
