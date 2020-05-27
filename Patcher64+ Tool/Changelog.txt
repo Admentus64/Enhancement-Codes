@@ -1,0 +1,57 @@
+27-05-2020
+- Included native Nintendo 64 patching in addition to Wii VC (N64) patching
+- Renamed the "Virtual Console - USA WAD Patcher" to "Patcher64+ Tool"
+- Dynamic Main Screen resizing depending on chosen Game Mode and Console
+- Added more REDUX additional changes, including Hero Mode!
+- Added tooltips for the REDUX additional changes
+- Re-organized the Ocarina of Time REDUX - Additional Changes window
+- Fixed several tooltips not showing
+- The option Leave D-Pad Up will now only automaticially be selected for OoT if no other button for the minimap was selected
+- Refactored code to the "Extension.psm1" file
+- Fixed Kokiri Sword icon not showing as available for Adult Link
+- Updated Russian translation for both Zelda 64 titles with fixed textures (useful for the texture pack)
+
+25-05-2020
+- Properly reset custom Channel Title and GameID when not enabled
+- Fixed not being able to drag and drop your N64 or V64 extension ROM Files
+- Allow Patch VC only to set a custom Channel Title as well
+- Automatized some of the code to calculate the GUI layout
+- Renamed "Current Mode : Free" to "Current Mode : Free (Nintendo 64)" for more clarity
+- Removed the Patch Descriptions panels for each game
+- Removed the Info VC Patching button
+- Added tooltips when hovering over buttons or checkboxes with the mouse for additional information
+- Included new romhack Majora's Mask - Masked Quest
+- Added new window to apply custom additional changes to OoT  Redux and MM Redux
+- Cleaning up even more code, make coding more practical
+- Added suggestion to enable or disable downgrading OoT when patching fails
+- Resolved issues with the WAD Patcher not stopping patching when the patch is not intended for the ROM
+
+23-05-2020
+- Grammar fixes
+- Split up info for Ocarina of Time and Majora's Mask
+- Added new VC Patching Info section
+- Added version label on top of main screen
+- Allow .N64 and .V64 to be selected as well for ROM injection
+- Renamed some descriptions for some more clarity
+- Included option to extract ROM only
+- Included label for Patch VC buttons
+
+22-05-2020
+- Added Current Mode indication
+- Support for Paper Mario (Hard Mode, Harde Mode+, Insane Mode)
+- Moved Custom Injection to the top, renamed Rom Injection
+- Free IPS and BPS patching for supported games
+- Checksum hash verification during free BPS patching that notifies if a patch has failed due not being it's intended rom target
+- Additional VC Patching options
+   * Allow to patch the WAD without injection or patching a rom
+   * Remap C-Down or Z to Minimap button (L) for Ocarina of Time / Majora's Mask
+   * Keep the D-Pad Up free to the Minimap button (L) for Ocarina of Time
+   * Remap D-Pad now remaps D-Pad Up for Ocarina of Time as well unless kept out of it
+   * Downgrade Ocarina of Time from 1.2 (used in VC) to 1.0
+   * Remove all .T64 texture injections
+- Fixed issue with the Custom Channel Title contain multiple same characters in sequence
+- Updated Patch Descriptions, Info, Credits and GameID's
+- Keep cleaning up code
+
+21-05-2020
+- Initial release
