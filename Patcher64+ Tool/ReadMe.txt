@@ -132,7 +132,7 @@ b) Free Mode likely will not work on anything other than Nintendo 64 titles for 
 ===============
 
 --- Tools ---
-Bighead (Custom Texture Tool and Initial Virtual Console Patcher)
+Bighead (Custom Texture Tool & Initial Virtual Console Patcher)
 Admentus (Mods Assemblage, Coding & Testing)
 GhostlyDark (Testing & Assistance)
 
@@ -153,14 +153,11 @@ junglechief
 Maroc
 Saneki
 
---- Majora's Mask: Masked Quest (ROM Hack) ---
-- Garo-Mastah
-- Aroenai
-- CloudMax
-- fkualol
-- VictorHale
-- Ideka
-- Saneki
+--- MM Young Link Model for Ocarina of Time ---
+slash004, The3Dude
+
+--- MM Adult Link Model for Ocarina of Time ---
+Skilar (https://youtu.be/x6MIeEZIsPw)
 
 --- Dawn & Dusk (ROM Hack) ---
 Captain Seedy-Eye (Lead Development, Music & Testing)
@@ -173,6 +170,18 @@ ZFG (Testing)
 Dry4Haz (Testing)
 Fig (Testing)
 
+--- The Fate of the Bombiwa (ROM Hack) ---
+DezZiBao
+
+--- Majora's Mask: Masked Quest (ROM Hack) ---
+Garo-Mastah
+Aroenai
+CloudMax
+fkualol
+VictorHale
+Ideka
+Saneki
+
 --- Translations: Ocarina of Time ---
 eduardo_a2j (Spanish v2.2)
 RPG (Polish v1.3)
@@ -183,10 +192,7 @@ madcell (Chinese Simplified 2009)
 RPG (Polish v1.1)
 Zelda64rus (Russian v2.0 Beta)
 
---- Super Mario 64: 60 FPS v2 (ROM Hack) ---
-Kaze Emanuar
-
---- Super Mario 64: Analog Camera (ROM Hack) ---
+--- Super Mario 64: 60 FPS v2 / Analog Camera (ROM Hack) ---
 Kaze Emanuar
 
 --- Super Mario 64: Multiplayer (ROM Hack) ---

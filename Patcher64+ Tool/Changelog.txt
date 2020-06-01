@@ -1,3 +1,29 @@
+01-06-2020
+- Fixed Majora's Mask's REDUX option not being able to patch
+
+31-05-2020
+- Even more additional Redux additions, including replacing Link's models for Ocarina of Time
+- Even more bug fixes
+- Smaller Extension.psm1 due to more direct BPS patching on decompressed Zelda 64 ROM files
+- Re-included the romhack The Fate of the Bombiwa again
+- Dawn & Dusk can now be patched on rev0 and rev1 ROM files
+- Inform about supported ROM File versions in the tooltips
+- Automatically uncheck Downgrade for Dawn & Dusk
+
+29-05-2020
+- Support for applying additional Redux changes without patching the core Redux patch to the ROM
+- Included hashsum checks for patching roms
+- Added support for Dawn & Dusk patches for rev0 and rev1 ROM files for Ocarina of Time
+- Refactoring code once more
+- Reset failed status with each new patching attempt, avoids the need to reopen the tool
+
+28-05-2020
+- Formated Current Mode label
+- Re-structured Redux options windows
+- Added more Redux options
+- Made the Input ROM textbox longer in Nintendo 64 mode
+- Fixed MM Redux not being enabled in Nintendo 64 mode
+
 27-05-2020
 - Included native Nintendo 64 patching in addition to Wii VC (N64) patching
 - Renamed the "Virtual Console - USA WAD Patcher" to "Patcher64+ Tool"

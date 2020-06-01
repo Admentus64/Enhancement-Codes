@@ -19,24 +19,32 @@ Add-Type -AssemblyName 'System.Drawing'
 #==============================================================================================================================================================================================
 # Setup global variables
 
-$global:Version = '27-05-2020'
+$global:Version = "01-06-2020"
 
-$global:ContinuePatching = $true
-$global:GameID = ''
-$global:ChannelTitle = ''
+$global:GameID = ""
+$global:ChannelTitle = ""
 $global:ChannelTitleLength = 40
 $global:GameType = $null
-$global:IsInject = $false
-$global:IsBPS = $false
-$global:IsVCPatch = $false
-$global:IsExtract = $false
-$global:IsRedux = $false
-$global:IsWiiVC = $true
-$global:PatchBootDol = $false
-$global:PatchedFileName = ''
-
+$global:GetCommand = $null
+$global:IsCompress = $false
+$global:IsRedux = $False
+$global:IsWiiVC = $True
+$global:PatchedFileName = ""
+$global:CheckHashSum = ""
 $global:CurrentModeFont = [System.Drawing.Font]::new("Microsoft Sans Serif", 12, [System.Drawing.FontStyle]::Bold)
 $global:VCPatchFont = [System.Drawing.Font]::new("Microsoft Sans Serif", 8, [System.Drawing.FontStyle]::Bold)
+
+
+
+#==============================================================================================================================================================================================
+# Hashes
+
+$global:HashSum_oot_rev0 = "C916AB315FBE82A22169BFF13D6B866E9FDDC907461EB6B0A227B82ACDF5B506"
+$global:HashSum_oot_rev1 = "FB87A0DAC188F9292C679DA7AC6F772ACEBE6F68E27293CFC281FC8636008DB0"
+$global:HashSum_oot_rev2 = "49ACD3885F13B0730119B78FB970911CC8ABA614FE383368015C21565983368D"
+$global:HashSum_mm = "EFB1365B3AE362604514C0F9A1A2D11F5DC8688BA5BE660A37DEBF5E3BE43F2B"
+$global:HashSum_sm64 = "17CE077343C6133F8C9F2D6D6D9A4AB62C8CD2AA57C40AEA1F490B4C8BB21D91"
+$global:HashSum_pp = "9EC6D2A5C2FCA81AB86312328779FD042B5F3B920BF65DF9F6B87B376883CB5B"
 
 
 
@@ -65,7 +73,9 @@ $global:Z64FilePath = $null
 $global:BPSFilePath = $null
 $global:PatchFile = $null
 $global:ROMFile = $null
-$global:OutputROMFile = $null
+$global:ROMCFile = $null
+$global:PatchedROMFile = $null
+$global:DecompressedROMFile = $null
 
 
 
@@ -186,99 +196,34 @@ function PrintHexArray([byte[]]$ByteArray) {
 
 
 #==============================================================================================================================================================================================
-function MainFunctionRomInject() {
+function MainFunctionReset([string]$Command, [string]$Hash, [boolean]$Compress) {
     
-    MainFunctionReset
+    $global:GetCommand = $Command
+    $global:IsCompress = $Compress
+    $global:IsRedux = $False
+    $global:PatchFile = $null
+    $global:PatchedFileName = "_patched"
+    $global:CheckHashSum = $Hash
 
-    $IsInject = $true
-    $PatchedFileName = '_injected'
+    if (!$IsWiiVC)                                                                  { $global:Z64File = SetZ64Parameters -Z64Path $GameZ64 }
+    if (!$InputCustomGameIDCheckbox.Checked)                                        { ChangeGameMode -Mode $GameType }
+    
+    if ($IsWiiVC -and $GetCommand -eq "Downgrade" -and $PatchVCDowngrade.Visible)   { $PatchVCDowngrade.Checked = $True }
+    elseif ($GetCommand -eq "No Downgrade")                                         { $PatchVCDowngrade.Checked = $False }
 
-    MainFunction
+    SetROMFile
 
 }
 
 
 
 #==============================================================================================================================================================================================
-function MainFunctionBPSPatch() {
+function MainFunctionOoTRedux([string]$Command, [string]$Hash, [boolean]$Compress) {
     
-    MainFunctionReset
-
-    $IsBPS = $true
-    $PatchFile = $BPSFilePath
-    $PatchedFileName = '_bps_patched'
-
-    MainFunction
-
-}
-
-#==============================================================================================================================================================================================
-function MainFunctionPatchVC() {
-    
-    MainFunctionReset
-
-    $IsVCPatch = $true
-    $PatchedFileName = '_vc_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionExtractROM() {
-    
-    MainFunctionReset
-
-    $IsExtract = $true
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionReset() {
-    
-    if ($GameType -eq "Ocarina of Time" -and !$InputCustomGameIDCheckbox.Checked) {
-        SetOcarinaOfTimeModeActive
-    }
-    elseif ($GameType -eq "Majora's Mask" -and !$InputCustomGameIDCheckbox.Checked) {
-        SetMajorasMaskModeActive
-    }
-    elseif ($GameType -eq "Super Mario 64" -and !$InputCustomGameIDCheckbox.Checked) {
-        SetSuperMario64ModeActive
-    }
-    elseif ($GameType -eq "Paper Mario" -and !$InputCustomGameIDCheckbox.Checked) {
-        SetPaperMarioModeActive
-    }
-    elseif ($GameType -eq "Free" -and !$InputCustomGameIDCheckbox.Checked) {
-        SetFreeModeActive
-    }
-
-    $IsInject = $false
-    $IsBPS = $false
-    $IsVCPatch = $false
-    $IsExtract = $false
-    $IsRedux = $false
-    $PatchBootDol = $false
-    $PatchFile = $null
-    $PatchedFileName = "_patched"
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionOoTRedux() {
-    
-    MainFunctionReset
+    MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
 
     $GameID = "NAC0"
     $ChannelTitle = "Redux: Ocarina"
-    $PatchFile = $Files.bpspatch_oot_redux
     $PatchedFileName = '_redux_patched'
     $IsRedux = $true
 
@@ -286,9 +231,9 @@ function MainFunctionOoTRedux() {
     $PatchVCRemapDPad.Checked = $true
     $PatchVCDowngrade.Checked = $true
 
-    if (!$PatchVCRemapCDown.Checked -and !$PatchVCRemapZ.Checked) {
-        $PatchVCLeaveDPadUp.Checked = $true
-    }
+    if ($IsWiiVC -and !$PatchVCRemapCDown.Checked -and !$PatchVCRemapZ.Checked) { $PatchVCLeaveDPadUp.Checked = $true }
+    if ($IncludeReduxOoT.Checked) { $PatchFile = $Files.bpspatch_oot_redux }
+    else { $PatchFile = $null }
 
     MainFunction
 
@@ -297,123 +242,17 @@ function MainFunctionOoTRedux() {
 
 
 #==============================================================================================================================================================================================
-function MainFunctionOoTDawn() {
+function MainFunctionMMRedux([string]$Command, [string]$Hash, [boolean]$Compress) {
     
-    MainFunctionReset
-
-    $GameID = "NAC1"
-    $ChannelTitle = "Zelda: Dawn & Dusk"
-    $PatchFile = $Files.bpspatch_oot_dawn
-    $PatchedFileName = '_dawn_&_dusk_patched'
-
-    MainFunctionPatchButton
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionOoTSpa() {
-    
-    MainFunctionReset
-
-    $GameID = "NACS"
-    $ChannelTitle = "Zelda: Ocarina (Spa)"
-    $PatchFile = $Files.bpspatch_oot_spa
-    $PatchedFileName = '_spanish_patched'
-
-    $PatchVCDowngrade.Checked = $true
-
-    MainFunctionPatchButton
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionOoTPol() {
-    
-    MainFunctionReset
-
-    $GameID = 'NACO'
-    $ChannelTitle = 'Zelda: Ocarina (Pol)'
-    $PatchFile = $Files.bpspatch_oot_pol
-    $PatchedFileName = '_polish_patched'
-
-    $PatchVCDowngrade.Checked = $true
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionOoTRus() {
-    
-    MainFunctionReset
-
-    $GameID = "NACR"
-    $ChannelTitle = "Zelda: Ocarina (Rus)"
-    $PatchFile = $Files.bpspatch_oot_rus
-    $PatchedFileName = '_russian_patched'
-
-    $PatchVCDowngrade.Checked = $true
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionOoTChi() {
-
-    MainFunctionReset
-    
-    $GameID = "NACC"
-    $ChannelTitle = "Zelda: Ocarina (Chi)"
-    $PatchFile = $Files.bpspatch_oot_chi
-    $PatchedFileName = '_chinese_patched'
-
-    $PatchVCDowngrade.Checked = $true
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionMMRedux() {
-    
-    MainFunctionReset
+    MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
 
     $GameID = "NAR0"
     $ChannelTitle = "Redux: Majora's"
-    $PatchFile = $Files.bpspatch_mm_redux
     $PatchedFileName = '_redux_patched'
     $IsRedux = $true
 
-    $PatchVCRemapDPad.Checked = $true
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionMMMaskedQuest() {
-    
-    MainFunctionReset
-
-    $GameID = "NAR1"
-    $ChannelTitle = "Zelda: Masked Quest"
-    $PatchFile = $Files.bpspatch_mm_masked_quest
-    $PatchedFileName = '_masked_quest_patched'
+    if ($IncludeReduxMM.Checked) { $PatchFile = $Files.bpspatch_mm_redux }
+    else { $PatchFile = $null }
 
     $PatchVCRemapDPad.Checked = $true
 
@@ -424,127 +263,24 @@ function MainFunctionMMMaskedQuest() {
 
 
 #==============================================================================================================================================================================================
-function MainFunctionMMPol() {
+function MainFunctionPatchRemap([String]$Command, [string]$Id, [string]$Title, [string]$Patch, [string]$PatchedFile, [string]$Hash, [Boolean]$Compress) {
     
-    MainFunctionReset
-
-    $GameID = "NARO"
-    $ChannelTitle = "Zelda: Majora's (Pol)"
-    $PatchFile = $Files.bpspatch_mm_pol
-    $PatchedFileName = '_polish_patched'
-
-    MainFunction
+    $PatchVCRemapDPad.Checked = $true
+    MainFunctionPatch -Command $Command -Id $Id -Title $Title -Patch $Patch -PatchedFile $PatchedFile -Hash $Hash -Compress $Compress
 
 }
 
 
 
 #==============================================================================================================================================================================================
-function MainFunctionMMRus() {
+function MainFunctionPatch([String]$Command, [string]$Id, [string]$Title, [string]$Patch, [string]$PatchedFile, [string]$Hash, [Boolean]$Compress) {
     
-    MainFunctionReset
+    MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
 
-    $GameID = "NARR"
-    $ChannelTitle = "Zelda: Majora's (Rus)"
-    $PatchFile = $Files.bpspatch_mm_rus
-    $PatchedFileName = '_russian_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionSM64FPS() {
-    
-    MainFunctionReset
-
-    $GameID = 'NAAX'
-    $ChannelTitle = "Super Mario 64: 60 FPS v2"
-    $PatchFile = $Files.bpspatch_sm64_fps
-    $PatchedFileName = '_60_fps_v2_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionSM64Cam() {
-    
-    MainFunctionReset
-
-    $GameID = 'NAAY'
-    $ChannelTitle = "Super Mario 64: Free Cam"
-    $PatchFile = $Files.bpspatch_sm64_cam
-    $PatchedFileName = '_analog_camera_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionSM64Multiplayer() {
-    
-    MainFunctionReset
-
-    $PatchBootDol = $true
-    $GameID = 'NAAM'
-    $ChannelTitle = "SM64: Multiplayer"
-    $PatchFile = $Files.bpspatch_sm64_multiplayer
-    $PatchedFileName = '_multiplayer__v1.4.2_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionPPHardMode() {
-    
-    MainFunctionReset
-
-    $GameID = 'NAE0'
-    $ChannelTitle = "Paper Mario: Hard Mode"
-    $PatchFile = $Files.bpspatch_pp_hard_mode
-    $PatchedFileName = '_hard_mode_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionPPHardModePlus() {
-    
-    MainFunctionReset
-
-    $GameID = 'NAE1'
-    $ChannelTitle = "Paper Mario: Hard Mode+"
-    $PatchFile = $Files.bpspatch_pp_hard_mode_plus
-    $PatchedFileName = '_hard_mode_plus_patched'
-
-    MainFunction
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function MainFunctionPPInsaneMode() {
-    
-    MainFunctionReset
-
-    $GameID = 'NAE2'
-    $ChannelTitle = "Paper Mario: Insane Mode"
-    $PatchFile = $Files.bpspatch_pp_insane_mode
-    $PatchedFileName = '_insane_mode_patched'
+    $GameID = $Id
+    $ChannelTitle = $Title
+    $PatchFile = $Patch
+    $PatchedFileName = $PatchedFile
 
     MainFunction
 
@@ -554,13 +290,14 @@ function MainFunctionPPInsaneMode() {
 
 #==============================================================================================================================================================================================
 function MainFunction() {
-    
-    # Step 01: Disable the main dialog and delete files if they still exist.
+
+    # Step 01: Disable the main dialog, allow patching and delete files if they still exist.
     DeleteAllFiles
-    $MainDialog.Enabled = $false
+    $ContinuePatching = $True
+    $MainDialog.Enabled = $False
 
     # Step 02: Create all the files.
-    CreateFiles
+    CreateFiles -Path $MasterPath
 
     # Only continue with these steps in VC WAD mode. Otherwise ignore these steps.
     if ($IsWiiVC) {
@@ -569,7 +306,7 @@ function MainFunction() {
         ExtractWADFile
 
         # Step 04: Check the GameID to be vanilla.
-        CheckGameID
+        $ContinuePatching = CheckGameID
 
         # Step 05: Stop if the GameID is not vanilla.
         if (!$ContinuePatching) {
@@ -584,59 +321,65 @@ function MainFunction() {
         ExtractU8AppFile
 
         # Step 08: Do some initial patching stuff for the ROM for VC WAD files.
-        PreparePatchROM
-    }
-    else {
-        # Step 09: Set the initial ROM File for N64 mode
-        $global:Z64File = SetZ64Parameters -Z64Path $GameZ64 -FolderName $Folder.Name
+        $ContinuePatching = PatchVCROM
     }
 
-    # Step 10: Patch and extend the ROM file with the patch through Floating IPS.
-    PatchROM
-
-    # Step 11: Stop here is there is an issue or the ROM is just being extracted.
-    if (!$ContinuePatching -or $IsExtract) {
+    # Step 09: Downgrade the ROM if required
+    $ContinuePatching = DowngradeROM
+    if (!$ContinuePatching) {
         DeleteAllFiles
         return
     }
 
-    # Step 12: Decompress a patched REDUX ROM and apply additional patches on top. Afterward compress it again.
+    $ContinuePatching = CompareHashSums
+    if (!$ContinuePatching) {
+        DeleteAllFiles
+        return
+    }
+
+    # Step 10: Decompress the ROM if required.
+    DecompressROM
+
+    # Step 11: Patch and extend the ROM file with the patch through Floating IPS.
+    $ContinuePatching = PatchROM
+    if (!$ContinuePatching) {
+        DeleteAllFiles
+        return
+    }
+
+    # Step 12: Apply additional patches on top of the Redux patches.
     PatchRedux
+
+    # Step 13: Compress the decompressed ROM if required.
+    CompressROM
 
     # Only continue with these steps in VC WAD mode. Otherwise ignore these steps.
     if ($IsWiiVC) {
-        # Step 13: Extend a ROM if it is neccesary for the Virtual Console. Mostly applies to decompressed ROMC files
+        # Step 14: Extend a ROM if it is neccesary for the Virtual Console. Mostly applies to decompressed ROMC files
         ExtendROM
 
-        # Step 14: Compress the ROMC again if possible.
-        CompressROM
+        # Step 15: Compress the ROMC again if possible.
+        CompressROMC
 
-        # Step 15: Apply Custom Channel Title and GameID if enabled.
+        # Step 16: Apply Custom Channel Title and GameID if enabled.
         SetCustomGameID
 
-        # Step 16: Hack the Channel Title.
+        # Step 17: Hack the Channel Title.
         HackOpeningBNRTitle
 
-        # Step 17: Repack the "00000005.app" with the updated ROM file.
+        # Step 18: Repack the "00000005.app" with the updated ROM file.
         RepackU8AppFile
 
-        # Step 18: Repack the WAD file with the updated APP file.
+        # Step 19: Repack the WAD file with the updated APP file.
         RepackWADFile
     }
 
-    # Step 19: Get rid of everything.
-    DeleteAllFiles
-
     # Step 20: Final message.
-    if ($IsWiiVC) {
-        UpdateStatusLabelDuringPatching -Text ('Finished patching the ' + $GameType + ' VC WAD file.')
-    }
-    else {
-        UpdateStatusLabelDuringPatching -Text ('Finished patching the ' + $GameType + ' ROM file.')
-    }
+    if ($IsWiiVC)   { UpdateStatusLabelDuringPatching -Text ('Finished patching the ' + $GameType + ' VC WAD file.') }
+    else            { UpdateStatusLabelDuringPatching -Text ('Finished patching the ' + $GameType + ' ROM file.') }
 
-    # Step 21: Enable the main dialog.
-    $MainDialog.Enabled = $true
+    # Step 21: Get rid of everything and enable the main dialog.
+    DeleteAllFiles
 
 }
 
@@ -648,23 +391,14 @@ function DeleteAllFiles() {
     RemovePath -LiteralPath $MasterPath
     RemovePath -LiteralPath ($BasePath + '\cygdrive')
 
-    if ($IsWiiCC) {
-        RemovePath -LiteralPath $WADFile.Folder
-    }
+    if ($IsWiiCC) { RemovePath -LiteralPath $WADFile.Folder }
 
     if ($IsRedux) {
-        $dmaTable = "dmaTable.dat"
-        if (Test-Path $dmaTable -PathType leaf) {
-            Remove-Item $dmaTable
-        }
-
-        $archive = "ARCHIVE.bin"
-        if (Test-Path $archive -PathType leaf) {
-            Remove-Item $archive
-        }
+        if (Test-Path dmaTable.dat -PathType leaf) { Remove-Item dmaTable.dat }
+        if (Test-Path ARCHIVE.bin -PathType leaf) { Remove-Item ARCHIVE.bin }
     }
 
-    $MainDialog.Enabled = $true
+    $MainDialog.Enabled = $True
 
 }
 
@@ -731,46 +465,51 @@ function SetFileParameters() {
     $Files = @{}
 
     # Store all files by their name.
-    $Files.flips                         = $MasterPath + "\flips.exe"
-    $Files.wadpacker                     = $MasterPath + "\wadpacker.exe"
-    $Files.wadunpacker                   = $MasterPath + "\wadunpacker.exe"
-    $Files.wszst                         = $MasterPath + "\wszst.exe"
+
+    $Files.ckey                          = $MasterPath + "\common-key.bin"
+    $Files.Compress                      = $MasterPath + "\Compress.exe"
     $Files.cygcrypto                     = $MasterPath + "\cygcrypto-0.9.8.dll"
     $Files.cyggccs1                      = $MasterPath + "\cyggcc_s-1.dll"
     $Files.cygncursesw10                 = $MasterPath + "\cygncursesw-10.dll"
     $Files.cygpng1616                    = $MasterPath + "\cygpng16-16.dll"
     $Files.cygwin1                       = $MasterPath + "\cygwin1.dll"
     $Files.cygz                          = $MasterPath + "\cygz.dll"
+    $Files.flips                         = $MasterPath + "\flips.exe"
+    $Files.lzss                          = $MasterPath + "\lzss.exe"
+    $Files.ndec                          = $MasterPath + "\ndec.exe"
     $Files.romc                          = $MasterPath + "\romc.exe"
     $Files.romchu                        = $MasterPath + "\romchu.exe"
-    $Files.lzss                          = $MasterPath + "\lzss.exe"
-    $Files.Compress                      = $MasterPath + "\Compress.exe"
-    $Files.ndec                          = $MasterPath + "\ndec.exe"
     $Files.TabExt                        = $MasterPath + "\TabExt.exe"
-    $Files.ckey                          = $MasterPath + "\common-key.bin"
-
-    $Files.bpspatch_oot_1_0              = $MasterPath + "\oot_1_0.bps"
-    $Files.bpspatch_oot_redux            = $MasterPath + "\oot_redux.bps"
-    $Files.bpspatch_oot_dawn             = $MasterPath + "\oot_dawn.bps"
-    $Files.bpspatch_oot_spa              = $MasterPath + "\oot_spa.bps"
-    $Files.bpspatch_oot_pol              = $MasterPath + "\oot_pol.bps"
-    $Files.bpspatch_oot_rus              = $MasterPath + "\oot_rus.bps"
-    $Files.bpspatch_oot_chi              = $MasterPath + "\oot_chi.bps"
-
-    $Files.bpspatch_mm_redux             = $MasterPath + "\mm_redux.bps"
+    $Files.wadpacker                     = $MasterPath + "\wadpacker.exe"
+    $Files.wadunpacker                   = $MasterPath + "\wadunpacker.exe"
+    $Files.wszst                         = $MasterPath + "\wszst.exe"
+    
     $Files.bpspatch_mm_masked_quest      = $MasterPath + "\mm_masked_quest.bps"
     $Files.bpspatch_mm_pol               = $MasterPath + "\mm_pol.bps"
+    $Files.bpspatch_mm_redux             = $MasterPath + "\mm_redux.bps"
     $Files.bpspatch_mm_rus               = $MasterPath + "\mm_rus.bps"
 
-    $Files.bpspatch_sm64_fps             = $MasterPath + "\sm64_fps.bps"
-    $Files.bpspatch_sm64_cam             = $MasterPath + "\sm64_cam.bps"
-    $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\sm64_multiplayer.bps"
-
+    $Files.bpspatch_oot_bombiwa          = $MasterPath + "\oot_bombiwa.bps"
+    $Files.bpspatch_oot_chi              = $MasterPath + "\oot_chi.bps"
+    $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\oot_dawn_rev0.bps"
+    $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\oot_dawn_rev1.bps"
+    $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\oot_dawn_rev2.bps"
+    $Files.bpspatch_oot_models_mm        = $MasterPath + "\oot_models_mm.bps"
+    $Files.bpspatch_oot_pol              = $MasterPath + "\oot_pol.bps"
+    $Files.bpspatch_oot_redux            = $MasterPath + "\oot_redux.bps"
+    $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\oot_rev1_to_rev0.bps"
+    $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\oot_rev2_to_rev0.bps"
+    $Files.bpspatch_oot_rus              = $MasterPath + "\oot_rus.bps"
+    $Files.bpspatch_oot_spa              = $MasterPath + "\oot_spa.bps"
+    
     $Files.bpspatch_pp_hard_mode         = $MasterPath + "\pp_hard_mode.bps"
     $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\pp_hard_mode_plus.bps"
     $Files.bpspatch_pp_insane_mode       = $MasterPath + "\pp_insane_mode.bps"
 
     $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\sm64_appFile_01.bps"
+    $Files.bpspatch_sm64_cam             = $MasterPath + "\sm64_cam.bps"
+    $Files.bpspatch_sm64_fps             = $MasterPath + "\sm64_fps.bps"
+    $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\sm64_multiplayer.bps"
 
     # Set it to a global value.
     return $Files
@@ -805,14 +544,11 @@ function SetWADParameters([string]$WADPath, [string]$FolderName) {
     $WADFile.tmd       = $WADFile.Folder + '\' + $FolderName + '.tmd'
     $WADFile.trailer   = $WADFile.Folder + '\' + $FolderName + '.trailer'
     
-    if ($gameType -eq "Majora's Mask" -or $gameType -eq "Paper Mario") {
-        $global:ROMFile = $WADFile.AppPath05 + '\romc'
-    }
-    else {
-        $global:ROMFile = $WADFile.AppPath05 + '\rom'
-    }
-
+    if ($gameType -eq "Majora's Mask" -or $gameType -eq "Paper Mario")   { $WADFile.ROMFile = $WADFile.AppPath05 + '\romc' }
+    else                                                                 { $WADFile.ROMFile = $WADFile.AppPath05 + '\rom' }
     $WADFile.Patched   = $WADFile.Path + '\' + $WADFile.Name + $PatchedFileName + '.wad'
+
+    SetROMFile
 
     # Set it to a global value.
     return $WADFile
@@ -821,26 +557,46 @@ function SetWADParameters([string]$WADPath, [string]$FolderName) {
 
 
 
+
 #==============================================================================================================================================================================================
-function SetZ64Parameters([string]$Z64Path, [string]$FolderName) {
+function SetZ64Parameters([string]$Z64Path) {
     
     # Create a hash table.
     $Z64File = @{}
 
-    # Get the WAD as an item object.
+    # Get the ROM as an item object.
     $Z64Item = Get-Item -LiteralPath $Z64Path
     
-    # Store some stuff about the Z64 that I'll probably reference.
+    # Store some stuff about the ROM that I'll probably reference.
     $Z64File.Name      = $Z64Item.BaseName
     $Z64File.Path      = $Z64Item.DirectoryName
-    $Z64File.Folder    = $Z64File.Path + '\' + $FolderName
 
-    $global:ROMFile = $Z64Path
-
+    $Z64File.ROMFile   = $Z64Path
     $Z64File.Patched   = $Z64File.Path + '\' + $Z64File.Name + $PatchedFileName + '.z64'
+
+    SetROMFile
 
     # Set it to a global value.
     return $Z64File
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function SetROMFile() {
+    
+    if ($IsWiiVC) {
+        $global:ROMFile = $WADFile.ROMFile
+        $global:ROMCFile = $WADFile.AppPath05 + "\out"
+        $global:PatchedROMFile = $WADFile.ROMFile
+        $global:DecompressedROMFile = $WADFile.AppPath05 + "\decompressed"
+    }
+    else {
+        $global:ROMFile = $Z64File.ROMFile
+        $global:PatchedROMFile = $Z64File.Patched
+        $global:DecompressedROMFile = "decompressed"
+    }
 
 }
 
@@ -1005,46 +761,39 @@ function PatchVCEmulator() {
 
     }
 
-    elseif ($GameType -eq "Super Mario 64" -and $PatchBootDol) {
+    elseif ($GameType -eq "Super Mario 64" -and $GetCommand -eq "Patch Boot DOL") {
         & $Files.flips $Files.bpspatch_sm64_appFile_01 $WADFile.AppFile01 | Out-Host
     }
 
 }
 
 
+
 #==============================================================================================================================================================================================
-function PreparePatchROM() {
+function PatchVCROM() {
     
     # Set the status label.
     UpdateStatusLabelDuringPatching -Text ('Initial patching of ' + $GameType + ' ROM...')
     
+    # Extract ROM if required
+    if ($GetCommand -eq "Extract") {
+        if ($GameType -ne "Free") { $ROMTitle = $GameType + ".z64" } else { $ROMTitle = "rom.z64" }
+        Move-Item $ROMFile -Destination $ROMTitle
+        return $False
+    }
+
     # Replace ROM if needed
-    if ($IsInject) {
+    if ($GetCommand -eq "Inject") {
         Remove-Item $ROMFile
         Copy-Item $Z64FilePath -Destination $ROMFile
     }
 
     # Decompress romc if needed
-    if (!$IsInject) {
-        if ($GameType -eq "Majora's Mask" -or $GameType -eq "Paper Mario") {
-            if ($IsWiiVC) { $global:OutputROMFile = $WADFile.AppPath05 + "\out.n64" } else { "out.n64" }
-
-            if ($GameType -eq "Majora's Mask") {
-                & $Files.romchu $ROMFile $OutputROMFile | Out-Host
-            }
-            elseif ($GameType -eq "Paper Mario") {
-                & $Files.romc d $ROMFile $outputROMFile | Out-Host
-            }
-
-            Remove-Item $ROMFile
-            Rename-Item -Path $outputROMFile -NewName "romc"
-        }
-    }
-
-    if ($IsExtract) {
-        if ($GameType -ne "Free") { $ROMTitle = $GameType + ".z64" } else { $ROMTitle = "rom.z64" }
-        Move-Item $ROMFile -Destination $ROMTitle
-        return
+    if ($GetCommand -ne "Inject" -and ($GameType -eq "Majora's Mask" -or $GameType -eq "Paper Mario") ) {  
+        if ($GameType -eq "Majora's Mask")     { & $Files.romchu $ROMFile $ROMCFile | Out-Host }
+        elseif ($GameType -eq "Paper Mario")   { & $Files.romc d $ROMFile $ROMCFile | Out-Host }
+        Remove-Item $ROMFile
+        Rename-Item -Path $ROMCFile -NewName "romc"
     }
 
     # Get the file as a byte array so the size can be analyzed.
@@ -1054,57 +803,107 @@ function PreparePatchROM() {
     $NewByteArray = New-Object Byte[] $ByteArray.Length
     
     # Fill the entire array with junk data. The patched ROM is slightly smaller than 8MB but we need an 8MB ROM.
-    for ($i=0 ; $i-lt $ByteArray.Length; $i++) {
-        $NewByteArray[$i] = 255
-    }
+    for ($i=0; $i-lt $ByteArray.Length; $i++) { $NewByteArray[$i] = 255 }
 
-    # Downgrade a ROM if it is required first
-    if ($GameType -eq "Ocarina of Time" -and $PatchVCDowngrade.Checked) {
-         & $Files.flips $Files.bpspatch_oot_1_0 $ROMFile | Out-Host
-    }
+    return $True
 
 }
 
 
+
 #==============================================================================================================================================================================================
-function PatchROM() {
+function DowngradeROM() {
+    
+    # Downgrade a ROM if it is required first
+    if ($GameType -eq "Ocarina of Time" -and $PatchVCDowngrade.Checked) {
+
+        $HashSum = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
+        if ($HashSum -ne $HashSum_oot_rev1 -and $HashSum -ne $HashSum_oot_rev2) {
+            UpdateStatusLabelDuringPatching -Text ("Failed! Ocarina of Time ROM does not match revision 1 or 2.")
+            return $False
+        }
+
+        if ($HashSum -eq $HashSum_oot_rev1) { & $Files.flips $Files.bpspatch_oot_rev1_to_rev0 $ROMFile | Out-Host }
+        elseif ($HashSum -eq $HashSum_oot_rev2) { & $Files.flips $Files.bpspatch_oot_rev2_to_rev0 $ROMFile | Out-Host }
+        $global:CheckHashSum = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
+
+    }
+
+    return $True
+    
+}
+
+
+
+#==============================================================================================================================================================================================
+function CompareHashSums() {
+    
+    if ($PatchFile -ne $null -and $GetCommand -ne "Patch BPS") {
+
+        $ContinuePatching = $True
+        $HashSum = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
+        
+        if ($CheckHashSum -eq "Dawn & Dusk") {
+            if ($HashSum -eq $HashSum_oot_rev0) { $PatchFile = $Files.bpspatch_oot_dawn_rev0 }
+            elseif ($HashSum -eq $HashSum_oot_rev1) { $PatchFile = $Files.bpspatch_oot_dawn_rev1 }
+            elseif ($HashSum -eq $HashSum_oot_rev2) { $PatchFile = $Files.bpspatch_oot_dawn_rev2 }
+            else { $ContinuePatching = $False }
+        }    
+        elseif ($HashSum -ne $CheckHashSum) { $ContinuePatching = $False }
+
+        if (!$ContinuePatching) {
+            UpdateStatusLabelDuringPatching -Text ("Failed! ROM does not match the patching button target. ROM has left unchanged.")
+            return $False
+        }
+
+    }
+
+    return $True
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function DecompressROM() {
+
+    if (!$IsCompress -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
+    
+    & $Files.TabExt $ROMFile | Out-Host
+    & $Files.ndec $ROMFile $DecompressedROMFile | Out-Host
+
+    if ($IsWiiVC) { Remove-Item $ROMFile }
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function PatchROM([string]$Hash) {
     
     # Set the status label.
-    UpdateStatusLabelDuringPatching -Text ('BPS Patching ' + $GameType + ' ROM...')
+    UpdateStatusLabelDuringPatching -Text ("BPS Patching " + $GameType + " ROM...")
 
+    $HashSum1 = $null
+    if ($IsWiiVC -and $GetCommand -eq "BPS Patch") { $HashSum1 = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash }
+    
     # Apply the selected patch to the ROM.
-    if ($PatchFile -ne $null -and !$IsBPS) {
-        if ($IsWiiVC) {
-            & $Files.flips $PatchFile $ROMFile | Out-Host
-        }
-        else {
-            & $Files.flips --apply $PatchFile $ROMFile $Z64File.Patched | Out-Host
-       }
-    }
-    elseif ($IsBPS) {
-        if ($IsWiiVC) {
-            $OldChecksum = Get-FileHash -Algorithm SHA256 $ROMFile
-            if ($IsWiiVC) {
-                & $Files.flips $PatchFile $ROMFile | Out-Host
-            }
-            $NewChecksum = Get-FileHash -Algorithm SHA256 $ROMFile
+    if ($IsWiiVC -and $IsCompress)         { & $Files.flips $PatchFile $DecompressedROMFile | Out-Host }
+    elseif ($IsWiiVC -and !$IsCompress)    { & $Files.flips $PatchFile $PatchedROMFile | Out-Host }
+    elseif (!$IsWiiVC -and $IsCompress)    { & $Files.flips --apply $PatchFile $ROMFile $DecompressedROMFile | Out-Host }
+    elseif (!$IsWiiVC -and !$IsCompress)   { & $Files.flips --apply $PatchFile $ROMFile $PatchedROMFile | Out-Host }
 
-            if ($OldChecksum.Hash -eq $NewChecksum.Hash) {
-                $global:ContinuePatching = $false
-                UpdateStatusLabelDuringPatching -Text 'Failed! BPS or IPS Patch does not match. ROM has left unchanged.'
-                if ($GameType -eq "Ocarina of Time" -and !$PatchVCDowngrade.Checked) {
-                    UpdateStatusLabelDuringPatching -Text 'Failed! BPS or IPS Patch does not match. ROM has left unchanged. Enable Downgrade Ocarina of Time?'
-                }
-                elseif ($GameType -eq "Ocarina of Time" -and $PatchVCDowngrade.Checked) {
-                    UpdateStatusLabelDuringPatching -Text = 'Failed! BPS or IPS Patch does not match. ROM has left unchanged. Disable Downgrade Ocarina of Time?'
-                }
-            }
+    if ($IsWiiVC -and $GetCommand -eq "BPS Patch") {
+        $HashSum2 = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
+        if ($HashSum1 -eq $HashSum2) {
+            UpdateStatusLabelDuringPatching -Text 'Failed! BPS or IPS Patch does not match. ROM has left unchanged.'
+            if ($GameType -eq "Ocarina of Time" -and !$PatchVCDowngrade.Checked) { UpdateStatusLabelDuringPatching -Text "Failed! BPS or IPS Patch does not match. ROM has left unchanged. Enable Downgrade Ocarina of Time?" }
+            elseif ($GameType -eq "Ocarina of Time" -and $PatchVCDowngrade.Checked) { UpdateStatusLabelDuringPatching -Text "Failed! BPS or IPS Patch does not match. ROM has left unchanged. Disable Downgrade Ocarina of Time?" }
+            return $False
         }
-        else {
-            & $Files.flips --apply $PatchFile $ROMFile $Z64File.Patched | Out-Host
-        }
-
     }
+
+    return $True
 
 }
 
@@ -1112,11 +911,23 @@ function PatchROM() {
 
 #==============================================================================================================================================================================================
 function CompressROM() {
+    
+    if (!$IsCompress -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
 
-    if (!$IsInject -and $GameType -eq "Paper Mario") {
-        & $Files.romc e $ROMFile $outputROMFile | Out-Host
+    & $Files.Compress $DecompressedROMFile $PatchedROMFile
+    Remove-Item $DecompressedROMFile
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function CompressROMC() {
+
+    if ($GetCommand -ne "Inject" -and $GameType -eq "Paper Mario") {
+        & $Files.romc e $ROMFile $ROMCFile | Out-Host
         Remove-Item $ROMFile
-        Rename-Item -Path $outputROMFile -NewName "romc"
+        Rename-Item -Path $ROMCFile -NewName "romc"
     }
 
 }
@@ -1126,31 +937,155 @@ function CompressROM() {
 #==============================================================================================================================================================================================
 function PatchRedux() {
     
-    $HasReduxOptions = CheckReduxOptions
-    if (!$IsRedux -or !$HasReduxOptions) {
-        return
-    }
+    # SETUP #
+
+    if (!$IsRedux -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
 
     UpdateStatusLabelDuringPatching -Text ('Patching ' + $GameType + ' REDUX...')
-    
-    if ($IsWiiVC) {
-        $global:OutputROMFile = $WADFile.AppPath05 + "\out"
-        & $Files.TabExt $ROMFile | Out-Host
-        & $Files.ndec $ROMFile $OutputROMFile | Out-Host
-        Remove-Item $ROMFile
+
+
+
+    # NEW DMATABLE #
+
+    $offsets = ""
+    if ($GameType -eq "Ocarina of Time") {
+        $offsets = "0 1 2 3 4 5 6 7 8 9 15 16 17 18 19 20 21 22 23 24 25 26 942 944 946 948 950 952 954 956 958 960 962 964 966 968 970 972 974 976 978 980 982 984 986 988 990 992 994 "
+        $offsets += "996 998 1000 1002 1004 1497 1498 1499 1500 1501 1502 1503 1504 1505 1506 1507 1508 1509 1510 1511 1512 1513 1514 1515 1516 1517 1518 1519 1520 1521 1522 1523 1524 1525"
     }
-    else {
-        $global:OutputROMFile = "out"
-        & $Files.TabExt $Z64File.Patched | Out-Host
-        & $Files.ndec $Z64File.Patched $OutputROMFile | Out-Host
+    elseif ($GameType -eq "Majora's Mask") {
+        $offsets = "0 1 2 3 4 5 6 7 -8 -9 15 16 17 18 19 20 -21 22 25 26 27 28 29 30 -652 1127 -1539 -1540 -1541 -1542 -1543 1544 "
+        $offsets += "1545 1546 1547 1548 1549 1550 -1551 1552 1553 1554 1555 1556 1557 1558 1559 1560 1561 1562 1563 1564 1565 1566 1567" 
+    }
+        
+    if (Test-Path dmaTable.dat -PathType leaf) { Remove-Item dmaTable.dat }
+    Add-Content dmaTable.dat $offsets
+
+
+
+    # BPS PATCHING #
+
+    if ($GameType -eq "Ocarina of Time") {
+
+        if ($MMModelsOoT.Checked) {
+            & $Files.flips --ignore-checksum $Files.bpspatch_oot_models_mm $DecompressedROMFile | Out-Host
+        }
+        
     }
 
-    $ByteArray = [IO.File]::ReadAllBytes($OutputROMFile)
+
+
+    # BYTE PATCHING #
+
+    $ByteArray = [IO.File]::ReadAllBytes($DecompressedROMFile)
 
     if ($GameType -eq "Ocarina of Time") {
         
-        if ($1xTextOoT.Checked) {
+        # HERO MODE #
+
+        if ($OHKOModeOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
+            $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
+            $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
+            $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+            $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
+            $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
+            $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
+        }
+        elseif (!$1xDamageOoT.Checked -and !$NormalRecoveryOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
+            $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
+            if ($NormalRecoveryOoT.Checked) {                
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                if ($2xDamageOoT.Checked ) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
+                }
+                elseif ($4xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
+                }
+                elseif ($8xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+                }
+
+                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
+                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
+                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
+            }
+            elseif ($HalfRecoveryOoT.Checked) {               
+                if ($1xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
+                }
+                elseif ($2xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
+                }
+                elseif ($4xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+                }
+                elseif ($8xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+                }
+
+                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
+                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
+                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
+            }
+            elseif ($QuarterRecoveryOoT.Checked) {                
+                if ($1xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
+                }
+                elseif ($2xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+                }
+                elseif ($4xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+                }
+                elseif ($8xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
+                }
+                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
+                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
+                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x83")
+
+            }
+            elseif ($NoRecoveryOoT.Checked) {                
+                if ($1xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
+                }
+                elseif ($2xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
+                }
+                elseif ($4xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+                }
+                elseif ($8xDamageOoT.Checked) {
+                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
+                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+                }
+                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
+                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
+            }
+        }
+
+
+
+        # TEXT DIALOGUE SPEED #
+
+        if ($1xTextOoT.Checked - $IncludeReduxOoT.Checked) {
             $ByteArray[(GetDecimal -Hex "0xB5006F")] = 1
+        }
+        elseif ($2xTextOoT.Checked -and !$IncludeReduxOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xB5006F")] = 2
         }
         elseif ($3xTextOoT.Checked) {
             $ByteArray[(GetDecimal -Hex "0x93B6E7")] = (GetDecimal -Hex "0x05")
@@ -1249,107 +1184,107 @@ function PatchRedux() {
 
 
 
-        # HERO MODE #
-
-        if ($OHKOModeOoT.Checked) {
-            $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
-            $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
-            $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-            $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
-            $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
-            $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
-        }
-        elseif (!$1xDamageOoT.Checked -and !$NormalRecoveryOoT.Checked) {
-            $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
-            if ($NormalRecoveryOoT.Checked) {                
-                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                if ($2xDamageOoT.Checked ) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                elseif ($4xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif ($8xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
-            }
-            elseif ($HalfRecoveryOoT.Checked) {               
-                if ($1xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                elseif ($2xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif ($4xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif ($8xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-                }
-
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
-            }
-            elseif ($QuarterRecoveryOoT.Checked) {                
-                if ($1xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif ($2xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif ($4xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-                }
-                elseif ($8xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x83")
-
-            }
-            elseif ($NoRecoveryOoT.Checked) {                
-                if ($1xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                elseif ($2xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif ($4xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif ($8xDamageOoT.Checked) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-                }
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x81")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
-            }
-        }
+        # GRAPHICS #
 
         if ($ExtendedDrawOoT.Checked) {
             $ByteArray[(GetDecimal -Hex "0xA9A970")] = 0
             $ByteArray[(GetDecimal -Hex "0xA9A971")] = 1
         }
+
+        if ($BlackBarsOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xB0F5A4")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5A5")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5A6")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5A7")] = 0
+
+            $ByteArray[(GetDecimal -Hex "0xB0F5D4")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5D5")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5D6")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5D7")] = 0
+
+            $ByteArray[(GetDecimal -Hex "0xB0F5E4")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5E5")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5E6")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F5E7")] = 0
+
+            $ByteArray[(GetDecimal -Hex "0xB0F680")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F681")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F682")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F683")] = 0
+
+            $ByteArray[(GetDecimal -Hex "0xB0F688")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F689")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F68A")] = 0
+            $ByteArray[(GetDecimal -Hex "0xB0F68B")] = 0
+        }
+
+        if ($ForceHiresModelOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xBE608B")] = 0
+        }
+
+
+
+        # EQUIPMENT #
+
+        if ($ReducedItemCapacityOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xB6EC2F")] = 20
+            $ByteArray[(GetDecimal -Hex "0xB6EC31")] = 25
+            $ByteArray[(GetDecimal -Hex "0xB6EC33")] = 30
+            $ByteArray[(GetDecimal -Hex "0xB6EC37")] = 10
+            $ByteArray[(GetDecimal -Hex "0xB6EC39")] = 15
+            $ByteArray[(GetDecimal -Hex "0xB6EC3B")] = 20
+            $ByteArray[(GetDecimal -Hex "0xB6EC57")] = 20
+            $ByteArray[(GetDecimal -Hex "0xB6EC59")] = 25
+            $ByteArray[(GetDecimal -Hex "0xB6EC5B")] = 30
+            $ByteArray[(GetDecimal -Hex "0xB6EC5F")] = 5
+            $ByteArray[(GetDecimal -Hex "0xB6EC61")] = 10
+            $ByteArray[(GetDecimal -Hex "0xB6EC63")] = 15
+            $ByteArray[(GetDecimal -Hex "0xB6EC67")] = 10
+            $ByteArray[(GetDecimal -Hex "0xB6EC69")] = 15
+            $ByteArray[(GetDecimal -Hex "0xB6EC6A")] = 20
+        }
+        elseif ($IncreasedIemCapacityOOT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xB6EC2F")] = 40
+            $ByteArray[(GetDecimal -Hex "0xB6EC31")] = 70
+            $ByteArray[(GetDecimal -Hex "0xB6EC33")] = 99
+            $ByteArray[(GetDecimal -Hex "0xB6EC37")] = 30
+            $ByteArray[(GetDecimal -Hex "0xB6EC39")] = 55
+            $ByteArray[(GetDecimal -Hex "0xB6EC3B")] = 80
+            $ByteArray[(GetDecimal -Hex "0xB6EC57")] = 40
+            $ByteArray[(GetDecimal -Hex "0xB6EC59")] = 70
+            $ByteArray[(GetDecimal -Hex "0xB6EC5B")] = 99
+            $ByteArray[(GetDecimal -Hex "0xB6EC5F")] = 15
+            $ByteArray[(GetDecimal -Hex "0xB6EC61")] = 30
+            $ByteArray[(GetDecimal -Hex "0xB6EC63")] = 45
+            $ByteArray[(GetDecimal -Hex "0xB6EC67")] = 30
+            $ByteArray[(GetDecimal -Hex "0xB6EC69")] = 55
+            $ByteArray[(GetDecimal -Hex "0xB6EC6A")] = 80
+        }
+
+        if ($UnlockSwordOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xBC77AD")] = 9
+            $ByteArray[(GetDecimal -Hex "0xBC77F7")] = 9
+        }
+
+        if ($UnlockTunicsOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xBC77B6")] = 9
+            $ByteArray[(GetDecimal -Hex "0xBC77B7")] = 9
+
+            $ByteArray[(GetDecimal -Hex "0xBC77FE")] = 9
+            $ByteArray[(GetDecimal -Hex "0xBC77FF")] = 9
+        }
+
+        if ($UnlockBootsOoT.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xBC77BA")] = 9
+            $ByteArray[(GetDecimal -Hex "0xBC77BB")] = 9
+
+            $ByteArray[(GetDecimal -Hex "0xBC7801")] = 9
+            $ByteArray[(GetDecimal -Hex "0xBC7802")] = 9
+        }
+
+
+
+        # OTHER #
 
         if ($MedallionsOoT.Checked) {
             $ByteArray[(GetDecimal -Hex "0xE2B454")] = (GetDecimal -Hex "0x80")
@@ -1375,31 +1310,6 @@ function PatchRedux() {
             $ByteArray[(GetDecimal -Hex "0x253C0E2")] = 3
         }
 
-        if ($HiresModelOoT.Checked) {
-            $ByteArray[(GetDecimal -Hex "0xBE608B")] = 0
-        }
-
-        if ($UnlockSwordOoT.Checked) {
-            $ByteArray[(GetDecimal -Hex "0xBC77AD")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77F7")] = 9
-        }
-
-        if ($UnlockTunicsOoT.Checked) {
-            $ByteArray[(GetDecimal -Hex "0xBC77B6")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77B7")] = 9
-
-            $ByteArray[(GetDecimal -Hex "0xBC77FE")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77FF")] = 9
-        }
-
-        if ($UnlockBootsOoT.Checked) {
-            $ByteArray[(GetDecimal -Hex "0xBC77BA")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77BB")] = 9
-
-            $ByteArray[(GetDecimal -Hex "0xBC7801")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC7802")] = 9
-        }
-
         if ($DisableLowHPSoundOoT.Checked) {
             $ByteArray[(GetDecimal -Hex "0xADBA1A")] = 0
             $ByteArray[(GetDecimal -Hex "0xADBA1B")] = 0
@@ -1412,7 +1322,7 @@ function PatchRedux() {
             $ByteArray[(GetDecimal -Hex "0xDF8B87")] = 0
         }
 
-        if ($HideDPadOOT.Checked) {
+        if ($HideDPadOOT.Checked -and $IncludeReduxOoT.Checked) {
             $ByteArray[(GetDecimal -Hex "0x348086E")] = (GetDecimal -Hex "0x00")
         }
 
@@ -1514,6 +1424,24 @@ function PatchRedux() {
             }
         }
 
+
+
+        # D-PAD #
+
+        if ($LeftDPadMM.Checked -and $IncludeReduxMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0x3806365")] = 1
+        }
+        elseif ($RightDPadMM.Checked -and $IncludeReduxMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0x3806365")] = 2
+        }
+        elseif ($HideDPadMM.Checked -and $IncludeReduxMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0x3806365")] = 0
+        }
+
+
+
+        # GRAPHICS #
+
         if ($ExtendedDrawMM.Checked) {
             $ByteArray[(GetDecimal -Hex "0xB50874")] = 0
             $ByteArray[(GetDecimal -Hex "0xB50875")] = 0
@@ -1521,11 +1449,49 @@ function PatchRedux() {
             $ByteArray[(GetDecimal -Hex "0xB50877")] = 0
         }
 
-        if ($LeftDPadMM.Checked) {
-            $ByteArray[(GetDecimal -Hex "0x3806365")] = 1
+        if ($BlackBarsMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xBF72A4")] = 0
+            $ByteArray[(GetDecimal -Hex "0xBF72A5")] = 0
+            $ByteArray[(GetDecimal -Hex "0xBF72A6")] = 0
+            $ByteArray[(GetDecimal -Hex "0xBF72A7")] = 0
         }
-        elseif ($HideDPadMM.Checked) {
-            $ByteArray[(GetDecimal -Hex "0x3806365")] = 0
+
+        if ($PixelatedStarsMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xB943FC")] = (GetDecimal -Hex "0x10")
+            $ByteArray[(GetDecimal -Hex "0xB943FD")] = 0
+        }
+
+
+
+        # EQUIPMENT #
+
+        if ($ReducedItemCapacityMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xC5834F")] = 20
+            $ByteArray[(GetDecimal -Hex "0xC58351")] = 25
+            $ByteArray[(GetDecimal -Hex "0xC58353")] = 30
+            $ByteArray[(GetDecimal -Hex "0xC58357")] = 10
+            $ByteArray[(GetDecimal -Hex "0xC58359")] = 15
+            $ByteArray[(GetDecimal -Hex "0xC5835B")] = 20
+            $ByteArray[(GetDecimal -Hex "0xC5837F")] = 5
+            $ByteArray[(GetDecimal -Hex "0xC58381")] = 10
+            $ByteArray[(GetDecimal -Hex "0xC58383")] = 15
+            $ByteArray[(GetDecimal -Hex "0xC58387")] = 10
+            $ByteArray[(GetDecimal -Hex "0xC58389")] = 15
+            $ByteArray[(GetDecimal -Hex "0xC5838B")] = 20
+        }
+        elseif ($IncreasedIemCapacityMM.Checked) {
+            $ByteArray[(GetDecimal -Hex "0xC5834F")] = 40
+            $ByteArray[(GetDecimal -Hex "0xC58351")] = 70
+            $ByteArray[(GetDecimal -Hex "0xC58353")] = 99
+            $ByteArray[(GetDecimal -Hex "0xC58357")] = 30
+            $ByteArray[(GetDecimal -Hex "0xC58359")] = 55
+            $ByteArray[(GetDecimal -Hex "0xC5835B")] = 80
+            $ByteArray[(GetDecimal -Hex "0xC5837F")] = 15
+            $ByteArray[(GetDecimal -Hex "0xC58381")] = 30
+            $ByteArray[(GetDecimal -Hex "0xC58383")] = 45
+            $ByteArray[(GetDecimal -Hex "0xC58387")] = 30
+            $ByteArray[(GetDecimal -Hex "0xC58389")] = 55
+            $ByteArray[(GetDecimal -Hex "0xC5838B")] = 80
         }
 
         if ($RazorSwordMM.Checked) {
@@ -1536,6 +1502,10 @@ function PatchRedux() {
             # Keep sword after Song of Time
             $ByteArray[(GetDecimal -Hex "0xBDA6B7")] = 1
         }
+
+
+
+        # OTHER #
 
         if ($DisableLowHPSoundMM.Checked) {
             $ByteArray[(GetDecimal -Hex "0xB97E2A")] = 0
@@ -1549,16 +1519,7 @@ function PatchRedux() {
 
     }
 
-    [io.file]::WriteAllBytes($OutputROMFile, $ByteArray)
-
-    if ($IsWiiVC) {
-        & $Files.Compress $OutputROMFile $ROMFile # | Out-Host
-    }
-    else {
-        & $Files.Compress $OutputROMFile $Z64File.Patched # | Out-Host
-    }
-
-    Remove-Item $OutputROMFile
+    [io.file]::WriteAllBytes($DecompressedROMFile, $ByteArray)
 
 }
 
@@ -1582,7 +1543,7 @@ function CheckGameID() {
     
     # Return if freely patching
     if ($GameType -eq "Free") {
-        return
+        return $False
     }
 
     # Set the status label.
@@ -1591,7 +1552,6 @@ function CheckGameID() {
     # Get the ".tmd" file as a byte array.
     $ByteArray = [IO.File]::ReadAllBytes($WadFile.tmd)
     
-    $global:ContinuePatching = $true
     $CompareArray = $null
 
     if ($GameType -eq "Ocarina of Time") {
@@ -1614,12 +1574,13 @@ function CheckGameID() {
         # The current values do not match
         if ($CompareArray[$i] -ne $CompareAgainst[$i]) {
             # This is not a "NACE", "NARE", "NAAE" or "NAEE" entry.
-            $global:ContinuePatching = $false
             UpdateStatusLabelDuringPatching -Text ('Failed! This is not an vanilla ' + $GameType + ' USA VC WAD file.')
             # Stop wasting time.
-            break
+            return $False
         }
     }
+
+    return $True
 
 }
 
@@ -1913,32 +1874,6 @@ function RepackWADFile() {
 
 
 #==================================================================================================================================================================================================================================================================
-function WADPath_Finish([object]$TextBox, [string]$VarName, [string]$WADPath) {
-    
-    # Set the "GameWAD" variable that tracks the path.
-    Set-Variable -Name $VarName -Value $WADPath -Scope 'Global'
-    $global:WADFilePath =  $WADPath
-
-    # Update the textbox to the current WAD.
-    $TextBox.Text = $WADPath
-
-    EnablePatchButtons -Enable $true
-
-    # Check if both a .WAD and .Z64 have been provided for ROM injection
-    if ($global:Z64FilePath -ne $null) {
-        $InjectROMButton.Enabled = $true
-    }
-
-    # Check if both a .WAD and .BPS have been provided for BPS patching
-    if ($global:BPSFilePath -ne $null) {
-        $PatchBPSButton.Enabled = $true
-    }
-
-}
-
-
-
-#==================================================================================================================================================================================================================================================================
 function EnablePatchButtons([boolean]$Enable) {
     
     # Set the status that we are ready to roll... Or not...
@@ -1960,12 +1895,13 @@ function EnablePatchButtons([boolean]$Enable) {
     $PatchOoTReduxButton.Enabled = $Enable
     $PatchOoTReduxOptionsButton.Enabled = $Enable
     $PatchOoTDawnButton.Enabled = $Enable
+    $PatchOoTBombiwaButton.Enabled = $Enable
     $PatchOoTSpaButton.Enabled = $Enable
     $PatchOoTPolButton.Enabled = $Enable
     $PatchOoTRusButton.Enabled = $Enable
     $PatchOoTChiButton.Enabled = $Enable
 
-    $PatchMMReduxButton.Enabled = $bool
+    $PatchMMReduxButton.Enabled = $Enable
     $PatchMMReduxOptionsButton.Enabled = $Enable
     $PatchMMMaskedQuestButton.Enabled = $Enable
     $PatchMMPolButton.Enabled = $Enable
@@ -1982,7 +1918,27 @@ function EnablePatchButtons([boolean]$Enable) {
     # Enable ROM extract
     $ExtractROMButton.Enabled = $Enable
 
+}
+
+
+
+#==================================================================================================================================================================================================================================================================
+function WADPath_Finish([object]$TextBox, [string]$VarName, [string]$WADPath) {
     
+    # Set the "GameWAD" variable that tracks the path.
+    Set-Variable -Name $VarName -Value $WADPath -Scope 'Global'
+    $global:WADFilePath =  $WADPath
+
+    # Update the textbox to the current WAD.
+    $TextBox.Text = $WADPath
+
+    EnablePatchButtons -Enable $true
+
+    # Check if both a .WAD and .Z64 have been provided for ROM injection
+    if ($global:Z64FilePath -ne $null) { $InjectROMButton.Enabled = $true }
+
+    # Check if both a .WAD and .BPS have been provided for BPS patching
+    if ($global:BPSFilePath -ne $null) { $PatchBPSButton.Enabled = $true }
 
 }
 
@@ -1995,22 +1951,16 @@ function Z64Path_Finish([object]$TextBox, [string]$VarName, [string]$Z64Path) {
     Set-Variable -Name $VarName -Value $Z64Path -Scope 'Global'
     $global:Z64FilePath =  $Z64Path
 
+    Write-Host (Get-FileHash -Algorithm SHA256 $Z64Path).Hash
+
     # Update the textbox to the current WAD.
     $TextBox.Text = $Z64Path
 
-    if (!$IsWiiVC) {
-        EnablePatchButtons -Enable $true
-    }
+    if (!$IsWiiVC) { EnablePatchButtons -Enable $true }
     
-    # Check if both a .WAD and .Z64 have been provided for ROM injection
-    if ($WADFilePath -ne $null -and $IsWiiVC) {
-        $InjectROMButton.Enabled = $true
-    }
-
-    # Check if both a .Z64 and .BPS have been provided for BPS patching
-    elseif ($BPSFilePath -ne $null -and !$IsWiiVC) {
-        $PatchBPSButton.Enabled = $true
-    }
+    # Check if both a .WAD and .Z64 have been provided for ROM injection or both a .Z64 and .BPS have been provided for BPS patching
+    if ($WADFilePath -ne $null -and $IsWiiVC)        { $InjectROMButton.Enabled = $true }
+    elseif ($BPSFilePath -ne $null -and !$IsWiiVC)   { $PatchBPSButton.Enabled = $true }
 
 }
 
@@ -2027,12 +1977,8 @@ function BPSPath_Finish([object]$TextBox, [string]$VarName, [string]$BPSPath) {
     $TextBox.Text = $BPSPath
 
     # Check if both a .WAD and .BPS have been provided for BPS patching
-    if ($WADFilePath -ne $null -and $IsWiiVC) {
-        $PatchBPSButton.Enabled = $true
-    }
-    elseif ($Z64FilePath -ne $null -and !$IsWiiVC) {
-        $PatchBPSButton.Enabled = $true
-    }
+    if ($WADFilePath -ne $null -and $IsWiiVC)       { $PatchBPSButton.Enabled = $true }
+    elseif ($Z64FilePath -ne $null -and !$IsWiiVC)   { $PatchBPSButton.Enabled = $true }
 
 }
 
@@ -2302,10 +2248,10 @@ function CreateMainDialog() {
     $InjectROMButton.Size = New-Object System.Drawing.Size(80, 22)
     $InjectROMButton.Location = New-Object System.Drawing.Size(495, 18)
     $InjectROMButton.Text = "Inject ROM"
-    $InjectROMButton.Add_Click({ MainFunctionInjectROM })
+    $InjectROMButton.Add_Click({ MainFunctionPatch -Command "Inject" -Id $null -Title $null -Patch $BPSFilePath -PatchedFile '_injected' -Hash $null -Compress $False })
     $InputROMGroup.Controls.Add($InjectROMButton)
     $ToolTip.SetToolTip($InjectROMButton, "Replace the ROM in your selected WAD File with your selected Z64, N64 or V64 ROM File")
-    
+
 
 
     ############
@@ -2354,7 +2300,10 @@ function CreateMainDialog() {
     $PatchBPSButton.Size = New-Object System.Drawing.Size(80, 22)
     $PatchBPSButton.Location = New-Object System.Drawing.Size(495, 18)
     $PatchBPSButton.Text = "Patch BPS"
-    $PatchBPSButton.Add_Click({ MainFunctionBPSPatch })
+    $PatchBPSButton.Add_Click({ MainFunctionPatch -Command "Patch BPS" -Id $null -Title $null -Patch $BPSFilePath -PatchedFile '_bps_patched' -Hash $null -Compress $False })
+
+    
+
     $InputBPSGroup.Controls.Add($PatchBPSButton)
     $ToolTip.SetToolTip($PatchBPSButton, "Patch your selected WAD File with your selected BPS or IPS Patch File")
 
@@ -2461,11 +2410,11 @@ function CreateMainDialog() {
     # Create a button to allow patching the WAD (OoT Redux).
     $global:PatchOoTReduxButton = New-Object System.Windows.Forms.Button
     $PatchOoTReduxButton.Size = New-Object System.Drawing.Size(80, 35)
-    $PatchOoTReduxButton.Location = New-Object System.Drawing.Size(190, 25)
+    $PatchOoTReduxButton.Location = New-Object System.Drawing.Size(135, 25)
     $PatchOoTReduxButton.Text = "OoT Redux"
-    $PatchOoTReduxButton.Add_Click({ MainFunctionOoTRedux })
+    $PatchOoTReduxButton.Add_Click({ MainFunctionOoTRedux -Command "Redux" -Hash $HashSum_oot_rev0 -Compress $True })
     $PatchOoTGroup.Controls.Add($PatchOoTReduxButton)
-    $ToolTip.SetToolTip($PatchOoTReduxButton, "A romhack that improves mechanics for Ocarina of Time`nIt includes the use of the D-Pad for additional dedicated item buttons")
+    $ToolTip.SetToolTip($PatchOoTReduxButton, "A romhack that improves mechanics for Ocarina of Time`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports rev0 US ROM File only")
 
     # Create a button to select additional Redux options.
     $global:PatchOoTReduxOptionsButton = New-Object System.Windows.Forms.Button
@@ -2479,11 +2428,20 @@ function CreateMainDialog() {
     # Create a button to allow patching the WAD (OoT Dawn and Dusk).
     $global:PatchOoTDawnButton = New-Object System.Windows.Forms.Button
     $PatchOoTDawnButton.Size = New-Object System.Drawing.Size(100, 35)
-    $PatchOoTDawnButton.Location = New-Object System.Drawing.Size(($PatchOoTReduxOptionsButton.Right + 15), $PatchOoTReduxButton.Top)
+    $PatchOoTDawnButton.Location = New-Object System.Drawing.Size(($PatchOoTReduxOptionsButton.Right + 15), $PatchOoTReduxOptionsButton.Top)
     $PatchOoTDawnButton.Text = 'Dawn and Dusk'
-    $PatchOoTDawnButton.Add_Click({ MainFunctionOoTDawn })
+    $PatchOoTDawnButton.Add_Click({ MainFunctionPatch -Command "No Downgrade" -Id "NAC1" -Title "Zelda: Dawn & Dusk" -Patch $Files.bpspatch_oot_dawn_rev0 -PatchedFile '_dawn_&_dusk_patched' -Hash "Dawn & Dusk" -Compress $False })
     $PatchOoTGroup.Controls.Add($PatchOoTDawnButton)
-    $ToolTip.SetToolTip($PatchOoTDawnButton, "A small-sized romhack in a completely new setting")
+    $ToolTip.SetToolTip($PatchOoTDawnButton, "A small-sized romhack in a completely new setting`nSupports rev0, rev1 or rev2 US ROM Files")
+
+    # Create a button to allow patching the WAD (OoT The Fate of the Bombiwa).
+    $global:PatchOoTBombiwaButton = New-Object System.Windows.Forms.Button
+    $PatchOoTBombiwaButton.Size = New-Object System.Drawing.Size(100, 35)
+    $PatchOoTBombiwaButton.Location = New-Object System.Drawing.Size(($PatchOoTDawnButton.Right + 15), $PatchOoTDawnButton.Top)
+    $PatchOoTBombiwaButton.Text = 'Bombiwa'
+    $PatchOoTBombiwaButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NAC2" -Title "Zelda: Bombiwa" -Patch $Files.bpspatch_oot_bombiwa -PatchedFile '_bombiwa_patched' -Hash $HashSum_oot_rev0 -Compress $True })
+    $PatchOoTGroup.Controls.Add($PatchOoTBombiwaButton)
+    $ToolTip.SetToolTip($PatchOoTBombiwaButton, "A small-sized romhack in a completely new setting, and extremely tricky and difficult`nSupports rev0 US ROM File only")
 
 
 
@@ -2496,36 +2454,37 @@ function CreateMainDialog() {
     $PatchOoTSpaButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchOoTSpaButton.Location = New-Object System.Drawing.Size(75, 70)
     $PatchOoTSpaButton.Text = "Spanish Translation"
-    $PatchOoTSpaButton.Add_Click({ MainFunctionOoTSpa })
+    $PatchOoTSpaButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACS" -Title "Zelda: Ocarina (SPA)" -Patch $Files.bpspatch_oot_spa -PatchedFile "_spanish_patched" -Hash $HashSum_oot_rev0 -Compress $True })
+
     $PatchOoTGroup.Controls.Add($PatchOoTSpaButton)
-    $ToolTip.SetToolTip($PatchOoTSpaButton, "Spanish Fan-Translation of Ocarina of Time")
+    $ToolTip.SetToolTip($PatchOoTSpaButton, "Spanish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only")
 
     # Create a button to allow patching the WAD (OoT Polish).
     $global:PatchOoTPolButton = New-Object System.Windows.Forms.Button
     $PatchOoTPolButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchOoTPolButton.Location = New-Object System.Drawing.Size(($PatchOoTSpaButton.Right + 15), $PatchOoTSpaButton.Top)
     $PatchOoTPolButton.Text = "Polish Translation"
-    $PatchOoTPolButton.Add_Click({ MainFunctionOoTPol })
+    $PatchOoTPolButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACO" -Title "Zelda: Ocarina (POL)" -Patch $Files.bpspatch_oot_pol -PatchedFile "_polish_patched" -Hash $HashSum_oot_rev0 -Compress $True })
     $PatchOoTGroup.Controls.Add($PatchOoTPolButton)
-    $ToolTip.SetToolTip($PatchOoTPolButton, "Polish Fan-Translation of Ocarina of Time")
+    $ToolTip.SetToolTip($PatchOoTPolButton, "Polish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only")
 
     # Create a button to allow patching the WAD (OoT Russian).
     $global:PatchOoTRusButton = New-Object System.Windows.Forms.Button
     $PatchOoTRusButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchOoTRusButton.Location = New-Object System.Drawing.Size(($PatchOoTPolButton.Right + 15), $PatchOoTSpaButton.Top)
     $PatchOoTRusButton.Text = "Russian Translation"
-    $PatchOoTRusButton.Add_Click({ MainFunctionOoTRus })
+    $PatchOoTRusButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACR" -Title "Zelda: Ocarina (RUS)" -Patch $Files.bpspatch_oot_rus -PatchedFile '_russian_patched' -Hash $HashSum_oot_rev0 -Compress $False })
     $PatchOoTGroup.Controls.Add($PatchOoTRusButton)
-    $ToolTip.SetToolTip($PatchOoTRusButton, "Russian Fan-Translation of Ocarina of Time")
+    $ToolTip.SetToolTip($PatchOoTRusButton, "Russian Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only")
 
     # Create a button to allow patching the WAD (OoT Chinese Simplified).
     $global:PatchOoTChiButton = New-Object System.Windows.Forms.Button
     $PatchOoTChiButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchOoTChiButton.Location = New-Object System.Drawing.Size(($PatchOoTRusButton.Right + 15), $PatchOoTSpaButton.Top)
     $PatchOoTChiButton.Text = "Chinese Translation"
-    $PatchOoTChiButton.Add_Click({ MainFunctionOoTChi })
+    $PatchOoTChiButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACC" -Title "Zelda: Ocarina (CHI)" -Patch $Files.bpspatch_oot_chi -PatchedFile "_chinese_patched" -Hash $HashSum_oot_rev0 -Compress $True })
     $PatchOoTGroup.Controls.Add($PatchOoTChiButton)
-    $ToolTip.SetToolTip($PatchOoTChiButton, "Chinese Fan-Translation of Ocarina of Time")
+    $ToolTip.SetToolTip($PatchOoTChiButton, "Chinese Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only")
 
 
     
@@ -2550,9 +2509,9 @@ function CreateMainDialog() {
     $PatchMMReduxButton.Size = New-Object System.Drawing.Size(80, 35)
     $PatchMMReduxButton.Location = New-Object System.Drawing.Size(190, 25)
     $PatchMMReduxButton.Text = "MM Redux"
-    $PatchMMReduxButton.Add_Click({ MainFunctionMMRedux })
+    $PatchMMReduxButton.Add_Click({ MainFunctionMMRedux -Command $null -Hash $HashSum_mm -Compress $True })
     $PatchMMGroup.Controls.Add($PatchMMReduxButton)
-    $ToolTip.SetToolTip($PatchMMReduxButton, "A romhack that improves mechanics for Majorea's Mask`nIt includes the use of the D-Pad for additional dedicated item buttons")
+    $ToolTip.SetToolTip($PatchMMReduxButton, "A romhack that improves mechanics for Majorea's Mask`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports US ROM File only")
 
     # Create a button to select additional Redux options.
     $global:PatchMMReduxOptionsButton = New-Object System.Windows.Forms.Button
@@ -2568,9 +2527,9 @@ function CreateMainDialog() {
     $PatchMMMaskedQuestButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchMMMaskedQuestButton.Location = New-Object System.Drawing.Size(($PatchMMReduxButton.Right + 35), $PatchMMReduxButton.Top)
     $PatchMMMaskedQuestButton.Text = "Masked Quest"
-    $PatchMMMaskedQuestButton.Add_Click({ MainFunctionMMMaskedQuest })
+    $PatchMMMaskedQuestButton.Add_Click({ MainFunctionPatchRemap -Command $null -Id "NAR1" -Title "Zelda: Masked Quest" -Patch $Files.bpspatch_mm_masked_quest -PatchedFile "_masked_quest_patched" -Hash $HashSum_mm -Compress $False })
     $PatchMMGroup.Controls.Add($PatchMMMaskedQuestButton)
-    $ToolTip.SetToolTip($PatchMMMaskedQuestButton, "A Master Quest style romhack for Majora's Mask, offering a higher difficulty")
+    $ToolTip.SetToolTip($PatchMMMaskedQuestButton, "A Master Quest style romhack for Majora's Mask, offering a higher difficulty`nSupports US ROM File only")
 
 
 
@@ -2583,18 +2542,18 @@ function CreateMainDialog() {
     $PatchMMPolButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchMMPolButton.Location = New-Object System.Drawing.Size($PatchMMReduxButton.Left, ($PatchMMReduxButton.Bottom + 10))
     $PatchMMPolButton.Text = "Polish Translation"
-    $PatchMMPolButton.Add_Click({ MainFunctionMMPol })
+    $PatchMMPolButton.Add_Click({ MainFunctionPatch -Command $null -Id "NARO" -Title "Zelda: Majora's (POL)" -Patch $Files.bpspatch_mm_pol -PatchedFile "_polish_patched" -Hash $HashSum_mm_ -Compress $True })
     $PatchMMGroup.Controls.Add($PatchMMPolButton)
-    $ToolTip.SetToolTip($PatchMMPolButton, "Polish Fan-Translation of Majora's Mask")
+    $ToolTip.SetToolTip($PatchMMPolButton, "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only")
 
     # Create a button to allow patching the WAD (MM Russian).
     $global:PatchMMRusButton = New-Object System.Windows.Forms.Button
     $PatchMMRusButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchMMRusButton.Location = New-Object System.Drawing.Size(($PatchMMPolButton.Right + 15), $PatchMMPolButton.Top)
     $PatchMMRusButton.Text = "Russian Translation"
-    $PatchMMRusButton.Add_Click({ MainFunctionMMRus })
+    $PatchMMRusButton.Add_Click({ MainFunctionPatch -Command $null -Id "NARR" -Title "Zelda: Majora's (RUS)" -Patch $Files.bpspatch_mm_rus -PatchedFile "_russian_patched" -Hash $HashSum_mm -Compress $False })
     $PatchMMGroup.Controls.Add($PatchMMRusButton)
-    $ToolTip.SetToolTip($PatchMMRusButton, "Polish Fan-Translation of Majora's Mask")
+    $ToolTip.SetToolTip($PatchMMRusButton, "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only")
 
 
 
@@ -2619,27 +2578,27 @@ function CreateMainDialog() {
     $PatchSM64FPSButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchSM64FPSButton.Location = New-Object System.Drawing.Size(130, 25)
     $PatchSM64FPSButton.Text = "60 FPS v2"
-    $PatchSM64FPSButton.Add_Click({ MainFunctionSM64FPS })
+    $PatchSM64FPSButton.Add_Click({ MainFunctionPatch -Command $null -Id "NAAX" -Title "Super Mario 64: 60 FPS v2" -Patch $Files.bpspatch_sm64_fps -PatchedFile "_60_fps_v2_patched" -Hash $HashSum_sm64 -Compress $False })
     $PatchSM64Group.Controls.Add($PatchSM64FPSButton)
-    $ToolTip.SetToolTip($PatchSM64FPSButton, "Increases the FPS from 30 to 60`nWtiness Super Mario 64 in glorious 60 FPS")
+    $ToolTip.SetToolTip($PatchSM64FPSButton, "Increases the FPS from 30 to 60`nWtiness Super Mario 64 in glorious 60 FPS`nSupports US ROM File only")
 
     # Create a button to allow patching the WAD (SM64 Analog Camera).
     $global:PatchSM64CamButton = New-Object System.Windows.Forms.Button
     $PatchSM64CamButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchSM64CamButton.Location = New-Object System.Drawing.Size(($PatchSM64FPSButton.Right + 15), $PatchSM64FPSButton.Top)
     $PatchSM64CamButton.Text = "Analog Camera"
-    $PatchSM64CamButton.Add_Click({ MainFunctionSM64Cam })
+    $PatchSM64CamButton.Add_Click({ MainFunctionPatch -Command $null -Id "NAAY" -Title "Super Mario 64: Free Cam" -Patch $Files.bpspatch_sm64_cam -PatchedFile "_analog_camera_patched" -Hash $HashSum_sm64 -Compress $False })
     $PatchSM64Group.Controls.Add($PatchSM64CamButton)
-    $ToolTip.SetToolTip($PatchSM64CamButton, "Enable full 360 degrees sideways analog camera`nEnable a second emulated controller and bind the Analog stick to the C-Stick on the first emulated controller")
+    $ToolTip.SetToolTip($PatchSM64CamButton, "Enable full 360 degrees sideways analog camera`nEnable a second emulated controller and bind the Analog stick to the C-Stick on the first emulated controller`nSupports US ROM File only")
 
     # Create a button to allow patching the WAD (SM64 Multiplayer).
     $global:PatchSM64MultiplayerButton = New-Object System.Windows.Forms.Button
     $PatchSM64MultiplayerButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchSM64MultiplayerButton.Location = New-Object System.Drawing.Size(($PatchSM64CamButton.Right + 15), $PatchSM64FPSButton.Top)
     $PatchSM64MultiplayerButton.Text = "Multiplayer v1.4.2"
-    $PatchSM64MultiplayerButton.Add_Click({ MainFunctionSM64Multiplayer })
+    $PatchSM64MultiplayerButton.Add_Click({ MainFunctionPatch -Command "Patch Boot DOL" -Id "NAAM" -Title "SM64: Multiplayer" -Patch $Files.bpspatch_sm64_multiplayer -PatchedFile "_multiplayer__v1.4.2_patched" -Hash $HashSum_sm64 -Compress $False })
     $PatchSM64Group.Controls.Add($PatchSM64MultiplayerButton)
-    $ToolTip.SetToolTip($PatchSM64MultiplayerButton, "Single-Screen Multiplayer with Mario and Luigi`nPlugin a second emulated controller for Luigi")
+    $ToolTip.SetToolTip($PatchSM64MultiplayerButton, "Single-Screen Multiplayer with Mario and Luigi`nPlugin a second emulated controller for Luigi`nSupports US ROM File only")
 
 
 
@@ -2664,27 +2623,27 @@ function CreateMainDialog() {
     $PatchPPHardMode.Size = New-Object System.Drawing.Size(100, 35)
     $PatchPPHardMode.Location = New-Object System.Drawing.Size(130, 25)
     $PatchPPHardMode.Text = "Hard Mode"
-    $PatchPPHardMode.Add_Click({ MainFunctionPPHardMode })
+    $PatchPPHardMode.Add_Click({ MainFunctionPatch -Command $null -Id "NAE0" -Title "Paper Mario: Hard Mode" -Patch $Files.bpspatch_pp_hard_mode -PatchedFile "_hard_mode_patched" -Hash $HashSum_pp -Compress $False })
     $PatchPPGroup.Controls.Add($PatchPPHardMode)
-    $ToolTip.SetToolTip($PatchPPHardMode, "Increases the damage dealt by enemies by 1.5x")
+    $ToolTip.SetToolTip($PatchPPHardMode, "Increases the damage dealt by enemies by 1.5x`nSupports US ROM File only")
 
     # Create a button to allow patching the WAD (PP 60 Hard Mode+).
     $global:PatchPPHardModePlus = New-Object System.Windows.Forms.Button
     $PatchPPHardModePlus.Size = New-Object System.Drawing.Size(100, 35)
     $PatchPPHardModePlus.Location = New-Object System.Drawing.Size(($PatchPPHardMode.Right + 15), $PatchPPHardMode.Top)
     $PatchPPHardModePlus.Text = "Hard Mode+"
-    $PatchPPHardModePlus.Add_Click({ MainFunctionPPHardModePlus })
+    $PatchPPHardModePlus.Add_Click({ MainFunctionPatch -Command $null -Id "NAE1" -Title "Paper Mario: Hard Mode+" -Patch $Files.bpspatch_pp_hard_mode_plus -PatchedFile "_hard_mode_plus_patched" -Hash $HashSum_pp -Compress $False })
     $PatchPPGroup.Controls.Add($PatchPPHardModePlus)
-    $ToolTip.SetToolTip($PatchPPHardModePlus, "Increases the damage dealt by enemies by 1.5x`nAlso increases the HP of enemies")
+    $ToolTip.SetToolTip($PatchPPHardModePlus, "Increases the damage dealt by enemies by 1.5x`nAlso increases the HP of enemies`nSupports US ROM File only")
 
     # Create a button to allow patching the WAD (PP 60 Insane Mode).
     $global:PatchPPInsaneMode = New-Object System.Windows.Forms.Button
     $PatchPPInsaneMode.Size = New-Object System.Drawing.Size(100, 35)
     $PatchPPInsaneMode.Location = New-Object System.Drawing.Size(($PatchPPHardModePlus.Right + 15), $PatchPPHardMode.Top)
     $PatchPPInsaneMode.Text = "Insane Mode"
-    $PatchPPInsaneMode.Add_Click({ MainFunctionPPInsaneMode })
+    $PatchPPInsaneMode.Add_Click({ MainFunctionPatch -Command $null -Id "NAE2" -Title "Paper Mario: Insane Mode" -Patch $Files.bpspatch_pp_insane_mode -PatchedFile "_insane_mode_patched" -Hash $HashSum_pp -Compress $False })
     $PatchPPGroup.Controls.Add($PatchPPInsaneMode)
-    $ToolTip.SetToolTip($PatchPPInsaneMode, "Increases the damage dealt by enemies by 2x")
+    $ToolTip.SetToolTip($PatchPPInsaneMode, "Increases the damage dealt by enemies by 2x`nSupports US ROM File only")
 
 
 
@@ -2851,7 +2810,7 @@ function CreateMainDialog() {
     $PatchVCButton.Size = New-Object System.Drawing.Size(150, 30)
     $PatchVCButton.Location = New-Object System.Drawing.Size(80, 65)
     $PatchVCButton.Text = "Patch VC Emulator Only"
-    $PatchVCButton.Add_Click({ MainFunctionPatchVC })
+    $PatchVCButton.Add_Click({ MainFunctionPatch -Command "Patch VC" -Id $null -Title $null -Patch $BPSFilePath -PatchedFile '_vc_patched' -Hash $null -Compress $False })
     $PatchVCButton.Enabled = $false
     $PatchVCGroup.Controls.Add($PatchVCButton)
     $ToolTip.SetToolTip($PatchVCButton, "Ignore any patches and only patches the Virtual Console emulator`nDowngrading and channing the Channel Title or GameID is still accepted")
@@ -2861,7 +2820,7 @@ function CreateMainDialog() {
     $ExtractROMButton.Size = New-Object System.Drawing.Size(150, 30)
     $ExtractROMButton.Location = New-Object System.Drawing.Size(240, 65)
     $ExtractROMButton.Text = "Extract ROM Only"
-    $ExtractROMButton.Add_Click({ MainFunctionExtractROM })
+    $ExtractROMButton.Add_Click({ MainFunctionPatch -Command "Extract" -Id $null -Title $null -Patch $BPSFilePath -PatchedFile '_extracted' -Hash $null -Compress $False })
     $PatchVCGroup.Controls.Add($ExtractROMButton)
     $ToolTip.SetToolTip($ExtractROMButton, "Only extract the .Z64 ROM from the WAD file`nUseful for native N64 emulators")
 
@@ -2894,7 +2853,7 @@ function CreateMainDialog() {
     $OoTGameOptionButton.Size = New-Object System.Drawing.Size(100, 22)
     $OoTGameOptionButton.Location = New-Object System.Drawing.Size(40, 25)
     $OoTGameOptionButton.Text = "Ocarina of Time"
-    $OoTGameOptionButton.Add_Click({ SetOcarinaOfTimeModeActive })
+    $OoTGameOptionButton.Add_Click({ ChangeGameMode -Mode "Ocarina of Time" })
     $GameOptionsGroup.Controls.Add($OoTGameOptionButton)
     $ToolTip.SetToolTip($OoTGameOptionButton, "Switch to Ocarina of Time Patching Mode")
 
@@ -2903,7 +2862,7 @@ function CreateMainDialog() {
     $MMGameOptionButton.Size = New-Object System.Drawing.Size(100, 22)
     $MMGameOptionButton.Location = New-Object System.Drawing.Size($OoTGameOptionButton.Left, ($OoTGameOptionButton.Bottom + 10))
     $MMGameOptionButton.Text = "Majora's Mask"
-    $MMGameOptionButton.Add_Click({ SetMajorasMaskModeActive })
+    $MMGameOptionButton.Add_Click({ ChangeGameMode -Mode "Majora's Mask" })
     $GameOptionsGroup.Controls.Add($MMGameOptionButton)
     $ToolTip.SetToolTip($MMGameOptionButton, "Switch to Majora's Mask Patching Mode")
 
@@ -2912,7 +2871,7 @@ function CreateMainDialog() {
     $SM64GameOptionButton.Size = New-Object System.Drawing.Size(100, 22)
     $SM64GameOptionButton.Location = New-Object System.Drawing.Size(($MMGameOptionButton.Right + 15), $OoTGameOptionButton.Top)
     $SM64GameOptionButton.Text = 'Super Mario 64'
-    $SM64GameOptionButton.Add_Click({ SetSuperMario64ModeActive })
+    $SM64GameOptionButton.Add_Click({ ChangeGameMode -Mode "Super Mario 64" })
     $GameOptionsGroup.Controls.Add($SM64GameOptionButton)
     $ToolTip.SetToolTip($SM64GameOptionButton, "Switch to Super Mario 64 Patching Mode")
 
@@ -2921,7 +2880,7 @@ function CreateMainDialog() {
     $PPGameOptionButton.Size = New-Object System.Drawing.Size(100, 22)
     $PPGameOptionButton.Location = New-Object System.Drawing.Size(($MMGameOptionButton.Right + 15), ($OoTGameOptionButton.Bottom + 10))
     $PPGameOptionButton.Text = 'Paper Mario'
-    $PPGameOptionButton.Add_Click({ SetPaperMarioModeActive })
+    $PPGameOptionButton.Add_Click({ ChangeGameMode -Mode "Paper Mario" })
     $GameOptionsGroup.Controls.Add($PPGameOptionButton)
     $ToolTip.SetToolTip($PPGameOptionButton, "Switch to Paper Mario Patching Mode")
 
@@ -2930,7 +2889,7 @@ function CreateMainDialog() {
     $FreeGameOptionButton.Size = New-Object System.Drawing.Size(100, 52)
     $FreeGameOptionButton.Location = New-Object System.Drawing.Size(($PPGameOptionButton.Right + 15), $OoTGameOptionButton.Top)
     $FreeGameOptionButton.Text = 'Free (N64)'
-    $FreeGameOptionButton.Add_Click({ SetFreeModeActive })
+    $FreeGameOptionButton.Add_Click({ ChangeGameMode -Mode "Free" })
     $GameOptionsGroup.Controls.Add($FreeGameOptionButton)
     $ToolTip.SetToolTip($FreeGameOptionButton, "Switch to Free Patching Mode for other Nintendo 64 titles")
 
@@ -3077,11 +3036,14 @@ function CreateMainDialog() {
 function SetMainScreenSize() {
     
     if ($IsWiiVC) {
+        
+        $InputROMTextBox.Width = $InputBPSTextBox.Width
+        $InputROMButton.Left = $InputBPSButton.Left
 
         $InputWADPanel.Location = New-Object System.Drawing.Size(10, 35)
-        $InputROMPanel.Location = New-Object System.Drawing.Size(10, 90)
-        $InputBPSPanel.Location = New-Object System.Drawing.Size(10, 145)
-        $CustomGameIDPanel.Location = New-Object System.Drawing.Size(10, 200)
+        $InputROMPanel.Location = New-Object System.Drawing.Size(10, ($InputWADPanel.Bottom + 5))
+        $InputBPSPanel.Location = New-Object System.Drawing.Size(10, ($InputROMPanel.Bottom + 5))
+        $CustomGameIDPanel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5))
 
         $PatchOoTPanel.Location = New-Object System.Drawing.Size(10, ($CustomGameIDPanel.Bottom + 5))
         $PatchMMPanel.Location = New-Object System.Drawing.Size(10, ($CustomGameIDPanel.Bottom + 5))
@@ -3101,8 +3063,11 @@ function SetMainScreenSize() {
 
     else {
         
+        $InputROMTextBox.Width = $InputWADTextBox.Width
+        $InputROMButton.Left = $InputWADButton.Left
+
         $InputROMPanel.Location = New-Object System.Drawing.Size(10, 35)
-        $InputBPSPanel.Location = New-Object System.Drawing.Size(10, 90)
+        $InputBPSPanel.Location = New-Object System.Drawing.Size(10, ($InputROMPanel.Bottom + 5))
 
         $PatchOoTPanel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5))
         $PatchMMPanel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5))
@@ -3124,7 +3089,7 @@ function SetMainScreenSize() {
 
 
 #==============================================================================================================================================================================================
-function ChangeGameMode() {
+function ChangeGameMode([string]$Mode) {
     
     $PatchOoTPanel.Hide()
     $PatchMMPanel.Hide()
@@ -3152,138 +3117,68 @@ function ChangeGameMode() {
     $PatchVCLeaveDPadUpLabel.Hide()
     $PatchVCLeaveDPadUp.Hide()
 
-    SetModeLabel
+    $global:GameType = $Mode
+ 
+    if ($GameType -eq "Ocarina of Time") {
+        $global:GameID = "NACE"
+        $global:ChannelTitle = "Zelda: Ocarina"
+        $PatchOoTPanel.Show()
+        $InfoOcarinaOfTimeButton.Show()
+
+        $PatchVCDowngradeLabel.Show()
+        $PatchVCDowngrade.Show()
+        $PatchVCLeaveDPadUpLabel.Show()
+        $PatchVCLeaveDPadUp.Show()
+    }
+    elseif ($GameType -eq "Majora's Mask") {
+        $global:GameID = "NARE"
+        $global:ChannelTitle = "Zelda: Majora's"
+        $PatchMMPanel.Show()
+        $InfoMajorasMaskButton.Show()
+    }
+    elseif ($GameType -eq "Super Mario 64") {
+        $global:GameID = "NAAE"
+        $global:ChannelTitle = "Super Mario 64"
+        $PatchSM64Panel.Show()
+        $InfoSuperMario64Button.Show()
+    }
+    elseif ($GameType -eq "Paper Mario") {
+        $global:GameID = "NAEE"
+        $global:ChannelTitle = "Paper Mario"
+        $PatchPPPanel.Show()
+        $InfoPaperMarioButton.Show()
+    }
+    else {
+        $global:GameID = "CUST"
+        $global:ChannelTitle = "Custom Channel"
+        $InfoFreeButton.Show()
+        $InputCustomChannelTitleTextBox.Hide()
+        $InputCustomChannelTitleTextBoxLabel.Hide()
+    }
+
+    if ($GameType -ne "Free") {
+        $InputCustomChannelTitleTextBox.Show()
+        $InputCustomChannelTitleTextBoxLabel.Show()
+    }
+
+    if ($GameType -eq "Ocarina of Time" -or $GameType -eq "Majora's Mask") {
+        $PatchVCExpandMemoryLabel.Show()
+        $PatchVCExpandMemory.Show()
+        $PatchVCRemapDPadLabel.Show()
+        $PatchVCRemapDPad.Show()
+
+        $PatchVCMinimapLabel.Show()
+        $PatchVCRemapCDownLabel.Show()
+        $PatchVCRemapCDown.Show()
+        $PatchVCRemapZLabel.Show()
+        $PatchVCRemapZ.Show()
+    }
+
+    $InputCustomChannelTitleTextBox.Text = $ChannelTitle
+    $InputCustomGameIDTextBox.Text =  $GameID
+
     CheckForCheckboxes
     SetWiiVCMode -Bool $IsWiiVC
-
-}
-
-
-#==============================================================================================================================================================================================
-function SetOcarinaOfTimeModeActive() {
-    
-    $global:GameType = "Ocarina of Time"
-    $global:GameID = "NACE"
-    $global:ChannelTitle = "Zelda: Ocarina"
-
-    ChangeGameMode
-
-    $PatchOoTPanel.Show()
-    $InfoOcarinaOfTimeButton.Show()
-
-    $InputCustomChannelTitleTextBox.Show()
-    $InputCustomChannelTitleTextBoxLabel.Show()
-    $InputCustomChannelTitleTextBox.Text = "Zelda: Ocarina"
-    $InputCustomGameIDTextBox.Text = "NACE"
-
-    $PatchVCExpandMemoryLabel.Show()
-    $PatchVCExpandMemory.Show()
-    $PatchVCRemapDPadLabel.Show()
-    $PatchVCRemapDPad.Show()
-    $PatchVCDowngradeLabel.Show()
-    $PatchVCDowngrade.Show()
-
-    $PatchVCMinimapLabel.Show()
-    $PatchVCRemapCDownLabel.Show()
-    $PatchVCRemapCDown.Show()
-    $PatchVCRemapZLabel.Show()
-    $PatchVCRemapZ.Show()
-    $PatchVCLeaveDPadUpLabel.Show()
-    $PatchVCLeaveDPadUp.Show()
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function SetMajorasMaskModeActive() {
-    
-    $global:GameType = "Majora's Mask"
-    $global:GameID = "NARE"
-    $global:ChannelTitle = "Zelda: Majora's"
-
-    ChangeGameMode
-
-    $PatchMMPanel.Show()
-    $InfoMajorasMaskButton.Show()
-
-    $InputCustomChannelTitleTextBox.Show()
-    $InputCustomChannelTitleTextBoxLabel.Show()
-    $InputCustomChannelTitleTextBox.Text = "Zelda: Majora"
-    $InputCustomGameIDTextBox.Text = "NARE"
-
-    $PatchVCExpandMemoryLabel.Show()
-    $PatchVCExpandMemory.Show()
-    $PatchVCRemapDPadLabel.Show()
-    $PatchVCRemapDPad.Show()
-
-    $PatchVCMinimapLabel.Show()
-    $PatchVCRemapCDownLabel.Show()
-    $PatchVCRemapCDown.Show()
-    $PatchVCRemapZLabel.Show()
-    $PatchVCRemapZ.Show()
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function SetSuperMario64ModeActive() {
-    
-    $global:GameType = "Super Mario 64"
-    $global:GameID = "NAAE"
-    $global:ChannelTitle = "Super Mario 64"
-
-    ChangeGameMode
-
-    $PatchSM64Panel.Show()
-    $InfoSuperMario64Button.Show()
-
-    $InputCustomChannelTitleTextBox.Show()
-    $InputCustomChannelTitleTextBoxLabel.Show()
-    $InputCustomChannelTitleTextBox.Text = "Super Mario 64"
-    $InputCustomGameIDTextBox.Text = "NAAE"
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function SetPaperMarioModeActive() {
-    
-    $global:GameType = "Paper Mario"
-    $global:GameID = "NAEE"
-    $global:ChannelTitle = "Paper Mario"
-
-    ChangeGameMode
-
-    $PatchPPPanel.Show()
-    $InfoPaperMarioButton.Show()
-
-    $InputCustomChannelTitleTextBox.Show()
-    $InputCustomChannelTitleTextBoxLabel.Show()
-    $InputCustomChannelTitleTextBox.Text = "Paper Mario"
-    $InputCustomGameIDTextBox.Text = "NAEE"
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function SetFreeModeActive() {
-
-    $global:GameType = "Free"
-    $global:GameID = "CUST"
-    $global:ChannelTitle = "Custom Channel"
-
-    ChangeGameMode
-
-    $InfoFreeButton.Show()
-
-    $InputCustomChannelTitleTextBox.Show()
-    $InputCustomChannelTitleTextBoxLabel.Show()
-    $InputCustomChannelTitleTextBox.Text = "Custom Channel"
-    $InputCustomGameIDTextBox.Text = "CUST"
 
 }
 
@@ -3298,6 +3193,7 @@ function SetWiiVCMode([boolean]$Bool) {
     $PatchVCPanel.Visible = $Bool
     $global:IsWiiVC = $Bool
     if ($Bool) { EnablePatchButtons -Enable ($WADFilePath -ne $null) } else { EnablePatchButtons -Enable ($Z64FilePath -ne $null) }
+    
     SetMainScreenSize
     SetModeLabel
 
@@ -3309,7 +3205,7 @@ function SetWiiVCMode([boolean]$Bool) {
 function SetModeLabel() {
 	
     $CurrentModeLabel.Text = "Current  Mode  :  " + $GameType
-    if ($IsWiiVC) { $CurrentModeLabel.Text += "  (Wii VC)" } else { $CurrentModeLabel.Text += "  (N64)" }
+    if ($IsWiiVC) { $CurrentModeLabel.Text += "  (Wii  VC)" } else { $CurrentModeLabel.Text += "  (N64)" }
     $CurrentModeLabel.Location = New-Object System.Drawing.Size(([Math]::Floor($MainDialog.Width / 2) - [Math]::Floor($CurrentModeLabel.Width / 2)), 10)
 
 }
@@ -3328,60 +3224,10 @@ function UpdateStatusLabelDuringPatching([String]$Text) {
 #==============================================================================================================================================================================================
 function CheckBootDolOptions() {
     
-    if ($PatchVCExpandMemory.Checked -and $PatchVCExpandMemory.Visible) { return $true }
-    elseif ($PatchVCRemapDPad.Checked -and $PatchVCRemapDPad.Visible) {  return $true }
-    elseif ($PatchVCRemapCDown.Checked -and $PatchVCRemapCDown.Visible) { return $true }
-    elseif ($PatchVCRemapZ.Checked -and $PatchVCRemapZ.Visible) { return $true }
-
-    return false
-
-}
-
-
-#==============================================================================================================================================================================================
-function CheckReduxOptions() {
-    
-    if ($GameType -eq "Ocarina of Time") {
-        if ($1xDamageOoT.Checked -and !$NormalRecoveryOoT.Checked) { return $true }
-        elseif ($2xDamageOoT.Checked) { return $true }
-        elseif ($4xDamageOoT.Checked ) { return $true }
-        elseif ($8xDamageOoT.Checked) { return $true }
-        elseif (!$1xDamageOoT.Checked -and $NormalRecoveryOoT.Checked) { return $true }
-        elseif ($HalfRecoveryOoT.Checked) { return $true }
-        elseif ($QuarterRecoveryOoT.Checked ) { return $true }
-        elseif ($NoRecoveryOoT.Checked) { return $true }
-        elseif ($OHKOModeOoT.Checked) { return $true }
-        elseif ($1xTextOoT.Checked) { return $true }
-        elseif ($3xTextOoT.Checked) { return $true }
-        elseif ($ExtendedDrawOoT.Checked) { return $true }
-        elseif ($MedallionsOoT.Checked) { return $true }
-        elseif ($ReturnChildOoT.Checked) { return $true }
-        elseif ($HiresModelOoT.Checked) { return $true }
-        elseif ($UnlockTunicsOoT.Checked) { return $true }
-        elseif ($UnlockSwordOoT.Checked) { return $true }
-        elseif ($UnlockBootsOoT.Checked) { return $true }
-        elseif ($DisableLowHPSoundOoT.Checked) { return $true }
-        elseif ($DisableNaviOoT.Checked) { return $true }
-        elseif ($HideDPadOoT.Checked) { return $true }
-    }
-    elseif ($GameType -eq "Majora's Mask") {
-        if ($1xDamageMM.Checked -and !$NormalRecoveryMM.Checked) { return $true }
-        elseif ($2xDamageMM.Checked) { return $true }
-        elseif ($4xDamageMM.Checked) { return $true }
-        elseif ($8xDamageMM.Checked) { return $true }
-        elseif (!$1xDamageMM.Checked -and $NormalRecoveryMM.Checked) { return $true }
-        elseif ($HalfRecoveryMM.Checked) { return $true }
-        elseif ($QuarterRecoveryMM.Checked) { return $true }
-        elseif ($NoRecoveryMM.Checked) { return $true }
-        elseif ($OHKOModeMM.Checked) { return $true }
-        elseif ($LeftDPadMM.Checked) { return $true }
-        elseif ($RightDPadMM.Checked) { return $true }
-        elseif ($HideDPadMM.Checked) { return $true }
-        elseif ($ExtendedDrawMM.Checked ) { return $true }
-        elseif ($RazorSwordMM.Checked) { return $true }
-        elseif ($DisableLowHPSoundMM.Checked) { return $true }
-        elseif ($PieceOfHeartSoundMM.Checked) { return $true }
-    }
+    if ($PatchVCExpandMemory.Checked -and $PatchVCExpandMemory.Visible)   { return $True }
+    elseif ($PatchVCRemapDPad.Checked -and $PatchVCRemapDPad.Visible)     { return $True }
+    elseif ($PatchVCRemapCDown.Checked -and $PatchVCRemapCDown.Visible)   { return $True }
+    elseif ($PatchVCRemapZ.Checked -and $PatchVCRemapZ.Visible)           { return $True }
 
     return $false
 
@@ -3392,33 +3238,16 @@ function CheckReduxOptions() {
 #==============================================================================================================================================================================================
 function CheckForCheckboxes() {
     
-    if ($PatchVCRemoveT64.Checked -and $PatchVCRemoveT64.Visible) {
-        $PatchVCButton.Enabled = $true
-    }
-    elseif ($PatchVCExpandMemory.Checked -and $PatchVCExpandMemory.Visible) {
-        $PatchVCButton.Enabled = $true
-    }
-    elseif ($PatchVCRemapDPad.Checked -and $PatchVCRemapDPad.Visible) {
-        $PatchVCButton.Enabled = $true
-    }
-    elseif ($PatchVCDowngrade.Checked -and $PatchVCDowngrade.Visible) {
-        $PatchVCButton.Enabled = $true
-    }
-    elseif ($PatchVCRemapCDown.Checked -and $PatchVCRemapCDown.Visible) {
-         $PatchVCButton.Enabled = $true
-    }
-    elseif ($PatchVCRemapZ.Checked -and $PatchVCRemapZ.Visible) {
-         $PatchVCButton.Enabled = $true
-    }
-    elseif ($PatchLeaveDPadUp.Checked -and $PatchLeaveDPadUp.Visible) {
-         $PatchVCButton.Enabled = $true
-    }
-    else {
-        $PatchVCButton.Enabled = $false
-    }
+    if ($PatchVCRemoveT64.Checked -and $PatchVCRemoveT64.Visible)             { $PatchVCButton.Enabled = $true }
+    elseif ($PatchVCExpandMemory.Checked -and $PatchVCExpandMemory.Visible)   { $PatchVCButton.Enabled = $true }
+    elseif ($PatchVCRemapDPad.Checked -and $PatchVCRemapDPad.Visible)         { $PatchVCButton.Enabled = $true }
+    elseif ($PatchVCDowngrade.Checked -and $PatchVCDowngrade.Visible)         { $PatchVCButton.Enabled = $true }
+    elseif ($PatchVCRemapCDown.Checked -and $PatchVCRemapCDown.Visible)       { $PatchVCButton.Enabled = $true }
+    elseif ($PatchVCRemapZ.Checked -and $PatchVCRemapZ.Visible)               { $PatchVCButton.Enabled = $true }
+    elseif ($PatchLeaveDPadUp.Checked -and $PatchLeaveDPadUp.Visible)         { $PatchVCButton.Enabled = $true }
+    else                                                                      { $PatchVCButton.Enabled = $false }
 
 }
-
 
 
 
@@ -3428,7 +3257,7 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     # Create the dialog that displays more info.
     $global:OoTReduxOptionsDialog = New-Object System.Windows.Forms.Form
     $OoTReduxOptionsDialog.Text = $ScriptName
-    $OoTReduxOptionsDialog.Size = New-Object System.Drawing.Size(700, 400)
+    $OoTReduxOptionsDialog.Size = New-Object System.Drawing.Size(700, 580)
     $OoTReduxOptionsDialog.MaximumSize = $OoTReduxOptionsDialog.Size
     $OoTReduxOptionsDialog.MinimumSize = $OoTReduxOptionsDialog.Size
     $OoTReduxOptionsDialog.MaximizeBox = $false
@@ -3453,39 +3282,39 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     $ToolTip.ReshowDelay = 0
     $ToolTip.ShowAlways = $true
 
-
-
-    ##############
-    # Checkboxex #
-    ##############
-
-    $row = 0
-    $column = 0
     $labelWidth = 135
     $labelHeight = 15
-    $baseX = 30
+    $baseX = 15
+    $baseY = 20
     $rowHeight = 30
     $columnWidth = $labelWidth + 20
 
+    #$OoTReduxOptionsDialog.Show()
 
+
+
+    # HERO MODE #
 
     # Create a groupbox for the Hero Mode buttons
     $HeroModeBox = New-Object System.Windows.Forms.GroupBox
-    $HeroModeBox.Location = New-Object System.Drawing.Size(($baseX - 15), 50)
-    $HeroModeBox.size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 4))
+    $HeroModeBox.Size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 3 + $baseY))
+    $HeroModeBox.Location = New-Object System.Drawing.Size($baseX, 50)
     $HeroModeBox.Text = " Hero Mode "
     $OoTReduxOptionsDialog.Controls.Add($HeroModeBox)
 
+    $row = 0
+    $column = 0
+
     # Create a panel for the Recovery buttons
     $DamagePanel = New-Object System.Windows.Forms.Panel
-    $DamagePanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 10 + $row * $rowHeight))
-    $DamagePanel.size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), 20)
+    $DamagePanel.Size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), $baseY)
+    $DamagePanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 5 + $row * $rowHeight))
     $HeroModeBox.Controls.Add($DamagePanel)
 
     # 1X Damage (Checkbox)
     $global:1xDamageOoT = New-Object System.Windows.Forms.RadioButton
-    $1xDamageOoT.Size = New-Object System.Drawing.Size(20, 20)
     $1xDamageOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $1xDamageOoT.Size = New-Object System.Drawing.Size(20, 20)
     $1xDamageOoT.Checked = $true
     $ToolTip.SetToolTip($1xDamageOoT, "Enemies deal normal damage")
 
@@ -3548,8 +3377,8 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
 
     # Create a panel for the Recovery buttons
     $RecoveryPanel = New-Object System.Windows.Forms.Panel
-    $RecoveryPanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 10 + $row * $rowHeight))
-    $RecoveryPanel.size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), 20)
+    $RecoveryPanel.Size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), $baseY)
+    $RecoveryPanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 5 + $row * $rowHeight))
     $HeroModeBox.Controls.Add($RecoveryPanel)
 
     # Normal Recovery (Checkbox)
@@ -3613,40 +3442,100 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
 
     $RecoveryPanel.Controls.AddRange(@($NormalRecoveryOoT, $HalfRecoveryOoT, $QuarterRecoveryOoT, $NoRecoveryOoT, $NormalRecoveryLabel, $HalfRecoveryLabel, $QuarterRecoveryLabel, $NoRecoveryLabel))
 
+    <#
+    $row = 2
+    $column = 0
+
+    # Create a panel for the Boss HP buttons
+    $BossHPPanel = New-Object System.Windows.Forms.Panel
+    $BossHPPanel.Size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), $baseY)
+    $BossHPPanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 5 + $row * $rowHeight))
+    $HeroModeBox.Controls.Add($BossHPPanel)
+
+    # 1x Boss HP (Checkbox)
+    $global:1xBossHPOoT = New-Object System.Windows.Forms.RadioButton
+    $1xBossHPOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $1xBossHPOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $1xBossHPOoT.Checked = $true
+    $ToolTip.SetToolTip($1xBossHPOoT, "Bosses have normal hit points")
+
+    # 1x Boss HP (Description)
+    $1xBossHPLabel = New-Object System.Windows.Forms.Label
+    $1xBossHPLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $1xBossHPLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $1xBossHPLabel.Text = "1x Boss HP"
+    $ToolTip.SetToolTip($1xBossHPLabel, "Bosses have normal hit points")
+
+    $column = 1
+
+    # 2x Boss HP (Checkbox)
+    $global:2xBossHPOoT = New-Object System.Windows.Forms.RadioButton
+    $2xBossHPOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $2xBossHPOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($2xBossHPOoT, "Bosses have double as much hit points")
+
+    # 2x Boss HP (Description)
+    $2xBossHPLabel = New-Object System.Windows.Forms.Label
+    $2xBossHPLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $2xBossHPLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $2xBossHPLabel.Text = "2x Boss HP"
+    $ToolTip.SetToolTip($2xBossHPLabel, "Bosses have double as much hit points")
+
+    $column = 2
+
+    # 3x Boss HP (Checkbox)
+    $global:3xBossHPOoT = New-Object System.Windows.Forms.RadioButton
+    $3xBossHPOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $3xBossHPOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($3xBossHPOoT, "Recovery Hearts will not restore Link's health anymore")
+
+    # 3x Boss HP (Description)
+    $3xBossHPLabel = New-Object System.Windows.Forms.Label
+    $3xBossHPLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $3xBossHPLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $3xBossHPLabel.Text = "3x Boss HP"
+    $ToolTip.SetToolTip($3xBossHPLabel, "Bosses have thrice as much hit points")
+
+    $BossHPPanel.Controls.AddRange(@($1xBossHPOoT, $2xBossHPOoT, $3xBossHPOoT, $1xBossHPLabel, $2xBossHPLabel, $3xBossHPLabel))
+    #>
+
     $row = 3
     $column = 0
 
     # OHKO MODE (Checkbox)
     $global:OHKOModeOoT = New-Object System.Windows.Forms.Checkbox
     $OHKOModeOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $OHKOModeOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + 15), ($row * $rowHeight - 5))
+    $OHKOModeOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight - $baseY/2))
     $ToolTip.SetToolTip($OHKOModeOoT, "Enemies kill Link with just a single hit\`nPrepare too die a lot")
 
     # OKHO Damage (Description)
     $OHKOModeLabel = New-Object System.Windows.Forms.Label
     $OHKOModeLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $OHKOModeLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20 + 15),  ($row * $rowHeight + 3 - 5))
+    $OHKOModeLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20 + $baseX),  ($row * $rowHeight + 3 - $baseY/2))
     $OHKOModeLabel.Text = "OHKO Mode"
     $ToolTip.SetToolTip($OHKOModeLabel, "Enemies kill Link with just a single hit\`nPrepare too die a lot")
 
     $HeroModeBox.Controls.AddRange(@($OHKOModeOoT, $OHKOModeLabel))
 
-    # EVERYTHING ELSE #
 
-    # Create a panel to contain everything for other.
-    $CheckboxesPanel = New-Object System.Windows.Forms.Panel
-    $CheckboxesPanel.Size = New-Object System.Drawing.Size($OoTReduxOptionsDialog.Width, 110)
-    $CheckboxesPanel.Location = New-Object System.Drawing.Size($baseX, ($HeroModeBox.Bottom + 15))
-    $OoTReduxOptionsDialog.Controls.Add($CheckboxesPanel)
+
+    # TEXT SPEED #
+
+    # Create a groupbox for the D-Pad buttons
+    $TextBox = New-Object System.Windows.Forms.GroupBox
+    $TextBox.Size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 1 + $baseY))
+    $TextBox.Location = New-Object System.Drawing.Size($baseX, ($HeroModeBox.Bottom + 5))
+    $TextBox.Text = " Text Dialogue Speed "
+    $OoTReduxOptionsDialog.Controls.Add($TextBox)
 
     $row = 0
     $column = 0
 
-    # Create a panel for the Text Speed buttons
+    # Create a panel for the D-Pad buttons
     $TextPanel = New-Object System.Windows.Forms.Panel
-    $TextPanel.Location = New-Object System.Drawing.Size(0, ($row * $rowHeight))
-    $TextPanel.size = New-Object System.Drawing.Size($OoTReduxOptionsDialog.Width, ($labelHeight + 3))
-    $CheckboxesPanel.Controls.Add($TextPanel)
+    $TextPanel.Size = New-Object System.Drawing.Size(($TextBox.Width - 30), ($TextBox.Height - 30))
+    $TextPanel.Location = New-Object System.Drawing.Size($baseX, $baseY)
+    $TextBox.Controls.Add($TextPanel)
 
     # 1X Text Speed (Checkbox)
     $global:1xTextOoT = New-Object System.Windows.Forms.RadioButton
@@ -3658,7 +3547,7 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     $1xTextLabel = New-Object System.Windows.Forms.Label
     $1xTextLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
     $1xTextLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
-    $1xTextLabel.Text = "1x Text Speed"
+    $1xTextLabel.Text = "1x Speed (Regular)"
     $ToolTip.SetToolTip($1xTextLabel, "Leave the dialogue text speed at normal")
 
     $column = 1
@@ -3674,7 +3563,7 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     $2xTextLabel = New-Object System.Windows.Forms.Label
     $2xTextLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
     $2xTextLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
-    $2xTextLabel.Text = "2x Text Speed"
+    $2xTextLabel.Text = "2x Speed"
     $ToolTip.SetToolTip($2xTextLabel, "Set the dialogue text speed to be twice as fast")
 
     $column = 2
@@ -3689,185 +3578,292 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     $3xTextLabel = New-Object System.Windows.Forms.Label
     $3xTextLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
     $3xTextLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
-    $3xTextLabel.Text = "3x Text Speed"
+    $3xTextLabel.Text = "3x Speed"
     $ToolTip.SetToolTip($3xTextLabel, "Set the dialogue text speed to be three times as fast")
 
     $TextPanel.Controls.AddRange(@($1xTextOoT, $2xTextOoT, $3xTextOoT, $1xTextLabel, $2xTextLabel, $3xTextLabel))
 
-    $row = 1
+
+
+    # GRAPHICS #
+
+    # Create a groupbox for the other buttons
+    $GraphicsBox = New-Object System.Windows.Forms.GroupBox
+    $GraphicsBox.Size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 1 + $baseY))
+    $GraphicsBox.Location = New-Object System.Drawing.Size($baseX, ($TextBox.Bottom + 5))
+    $GraphicsBox.Text = " Graphics "
+    $OoTReduxOptionsDialog.Controls.Add($GraphicsBox)
+
+    $row = 0
     $column = 0
 
     # Increase Extended Draw Distance (Checkbox)
     $global:ExtendedDrawOoT = New-Object System.Windows.Forms.Checkbox
     $ExtendedDrawOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $ExtendedDrawOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($ExtendedDrawOoT)
+    $ExtendedDrawOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($ExtendedDrawOoT, "Increases the game's draw distance for objects`nDoes not work on all objects")
     
     # Increase Extended Draw Distance (Description)
     $ExtendedDrawLabel = New-Object System.Windows.Forms.Label
     $ExtendedDrawLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $ExtendedDrawLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $ExtendedDrawLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $ExtendedDrawLabel.Text = "Extended Draw Distance"
-    $CheckboxesPanel.Controls.Add($ExtendedDrawLabel)
     $ToolTip.SetToolTip($ExtendedDrawLabel, "Increases the game's draw distance for objects`nDoes not work on all objects")
 
     $column = 1
 
-    # Force Hires Link Model (Checkbox)
-    $global:HiresModelOoT = New-Object System.Windows.Forms.Checkbox
-    $HiresModelOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $HiresModelOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($HiresModelOoT)
-    $ToolTip.SetToolTip($HiresModelOoT, "Always use Link's High Resolution Model when Link is too far away")
+    # No Black Bars (Checkbox)
+    $global:BlackBarsOoT = New-Object System.Windows.Forms.Checkbox
+    $BlackBarsOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $BlackBarsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($BlackBarsOoT, "Removes the black bars shown on the top and bottom of the screen during Z-targeting and cutscenes")
     
-    # Force Hires Link Model (Description)
-    $HiresModelLabel = New-Object System.Windows.Forms.Label
-    $HiresModelLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $HiresModelLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
-    $HiresModelLabel.Text = "Force Hires Link Model"
-    $CheckboxesPanel.Controls.Add($HiresModelLabel)
-    $ToolTip.SetToolTip($HiresModelLabel, "Always use Link's High Resolution Model when Link is too far away")
+    # No Black Bars (Description)
+    $BlackBarsLabel = New-Object System.Windows.Forms.Label
+    $BlackBarsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $BlackBarsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $BlackBarsLabel.Text = "No Black Bars"
+    $ToolTip.SetToolTip($BlackBarsLabel, "Removes the black bars shown on the top and bottom of the screen during Z-targeting and cutscenes")
 
     $column = 2
-    
-    # Require All Medallions for Ganon's Castle (Checkbox)
-    $global:MedallionsOoT = New-Object System.Windows.Forms.Checkbox
-    $MedallionsOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $MedallionsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($MedallionsOoT)
-    $ToolTip.SetToolTip($MedallionsOoT, "All six medallions are required for the Rainbow Bridge to appear before Ganon's Castle`The vanilla requirements were the Shadow and Spirit Medallions and the Light Arrows")
 
-    # All Medallions - Ganon's Castle (Description)
-    $MedallionsLabel = New-Object System.Windows.Forms.Label
-    $MedallionsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $MedallionsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
-    $MedallionsLabel.Text = "Require All Medallions"
-    $CheckboxesPanel.Controls.Add($MedallionsLabel)
-    $ToolTip.SetToolTip($MedallionsLabel, "All six medallions are required for the Rainbow Bridge to appear before Ganon's Castle`nThe vanilla requirements were the Shadow and Spirit Medallions and the Light Arrows")
+    # Force Hires Link Model (Checkbox)
+    $global:ForceHiresModelOoT = New-Object System.Windows.Forms.Checkbox
+    $ForceHiresModelOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $ForceHiresModelOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($ForceHiresModelOoT, "Always use Link's High Resolution Model when Link is too far away")
+    
+    # Force Hires Link Model (Description)
+    $ForceHiresModelLabel = New-Object System.Windows.Forms.Label
+    $ForceHiresModelLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $ForceHiresModelLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $ForceHiresModelLabel.Text = "Force Hires Link Model"
+    $ToolTip.SetToolTip($ForceHiresModelLabel, "Completely change Link's model with a high resolution version")
 
     $column = 3
 
-    # Can Return to Child Before Clearing Forest Temple (Checkbox)
-    $global:ReturnChildOoT = New-Object System.Windows.Forms.Checkbox
-    $ReturnChildOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $ReturnChildOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($ReturnChildOoT)
-    $ToolTip.SetToolTip($ReturnChildOoT, "You can always go back to being a child again before clearing the boss of the Forest Temple`nOut of the way Sheik!")
+    # MM Link Models (Checkbox)
+    $global:MMModelsOoT = New-Object System.Windows.Forms.Checkbox
+    $MMModelsOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $MMModelsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($MMModelsOoT, "Replaces Link's models to be styled towards Majora's Mask")
+    
+    # MM Link Models (Description)
+    $MMModelsLabel = New-Object System.Windows.Forms.Label
+    $MMModelsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $MMModelsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $MMModelsLabel.Text = "Replace Link's Models"
+    $ToolTip.SetToolTip($MMModelsLabel, "Replaces Link's models to be styled towards Majora's Mask")
 
-    # Can Return to Child Before Clearing Forest Temple (Description)
-    $ReturnChildLabel = New-Object System.Windows.Forms.Label
-    $ReturnChildLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $ReturnChildLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
-    $ReturnChildLabel.Text = "Can Always Return"
-    $CheckboxesPanel.Controls.Add($ReturnChildLabel)
-    $ToolTip.SetToolTip($ReturnChildLabel, "You can always go back to being a child again before clearing the boss of the Forest Temple`nOut of the way Sheik!")
+    $GraphicsBox.Controls.AddRange(@($ExtendedDrawOoT, $BlackBarsOoT, $ForceHiresModelOoT, $MMModelsOoT, $ExtendedDrawLabel, $BlackBarsLabel, $ForceHiresModelLabel, $MMModelsLabel))
 
-    $row = 2
+
+
+    # EQUIPMENT #
+
+    # Create a groupbox for the equipment buttons
+    $EquipmentBox = New-Object System.Windows.Forms.GroupBox
+    $EquipmentBox.Size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 2 + $baseY))
+    $EquipmentBox.Location = New-Object System.Drawing.Size($baseX, ($GraphicsBox.Bottom + 5))
+    $EquipmentBox.Text = " Equipment "
+    $OoTReduxOptionsDialog.Controls.Add($EquipmentBox)
+
+    $row = 0
     $column = 0
 
-    # Unlock Tunics Child Link (Checkbox)
-    $global:UnlockTunicsOoT = New-Object System.Windows.Forms.Checkbox
-    $UnlockTunicsOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $UnlockTunicsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($UnlockTunicsOoT)
-    $ToolTip.SetToolTip($UnlockTunicsOoT, "Child Link is able to use the Goron TUnic and Zora Tunic`nSince you might want to walk around in style as well when you are young")
+    # Create a panel for the Item Capacity buttons
+    $ItemCapacityPanel = New-Object System.Windows.Forms.Panel
+    $ItemCapacityPanel.Size = New-Object System.Drawing.Size(($EquipmentBox.Width - 30), ($EquipmentBox.Height / 2 - 15))
+    $ItemCapacityPanel.Location = New-Object System.Drawing.Size($baseX, $baseY)
+    $EquipmentBox.Controls.Add($ItemCapacityPanel)
 
-    # Unlock Tunics Child Link (Description)
-    $UnlockTunicsLabel = New-Object System.Windows.Forms.Label
-    $UnlockTunicsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $UnlockTunicsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
-    $UnlockTunicsLabel.Text = "Unlock Tunics"
-    $CheckboxesPanel.Controls.Add($UnlockTunicsLabel)
-    $ToolTip.SetToolTip($UnlockTunicsLabel, "Child Link is able to use the Goron TUnic and Zora Tunic`nSince you might want to walk around in style as well when you are young")
+    # Reduced Item Capacity (Checkbox)
+    $global:ReducedItemCapacityOoT = New-Object System.Windows.Forms.Radiobutton
+    $ReducedItemCapacityOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $ReducedItemCapacityOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($ReducedItemCapacityOoT, "Decrease the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+    
+    # Reduced Item Capacity (Description)
+    $ReducedItemCapacityLabel = New-Object System.Windows.Forms.Label
+    $ReducedItemCapacityLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $ReducedItemCapacityLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $ReducedItemCapacityLabel.Text = "Reduced Item Capacity"
+    $ToolTip.SetToolTip($ReducedItemCapacityLabel, "Decrease the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
 
     $column = 1
 
-    # Unlock Boots Child Link (Checkbox)
-    $global:UnlockBootsOoT = New-Object System.Windows.Forms.Checkbox
-    $UnlockBootsOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $UnlockBootsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($UnlockBootsOoT)
-    $ToolTip.SetToolTip($UnlockBootsOoT, "Child Link is able to use the Iron Boots and Hover Boots")
+    # Normal Item Capacity (Checkbox)
+    $global:NormalItemCapacityOoT = New-Object System.Windows.Forms.Radiobutton
+    $NormalItemCapacityOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $NormalItemCapacityOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $NormalItemCapacityOoT.Checked = $True
+    $ToolTip.SetToolTip($NormalItemCapacityOoT, "Keep the normal amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
 
-    # Unlock Boots Child Link (Description)
-    $UnlockBootsLabel = New-Object System.Windows.Forms.Label
-    $UnlockBootsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $UnlockBootsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
-    $UnlockBootsLabel.Text = "Unlock Boots"
-    $CheckboxesPanel.Controls.Add($UnlockBootsLabel)
-    $ToolTip.SetToolTip($UnlockBootsLabel, "Child Link is able to use the Iron Boots and Hover Boots")
+    # Normal Item Capacity (Description)
+    $NormalItemCapacityLabel = New-Object System.Windows.Forms.Label
+    $NormalItemCapacityLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $NormalItemCapacityLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $NormalItemCapacityLabel.Text = "Normal Item Capacity"
+    $ToolTip.SetToolTip($NormalItemCapacityLabel, "Keep the normal amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
 
     $column = 2
+
+    # Increased Item Capacity (Checkbox)
+    $global:IncreasedItemCapacityOoT = New-Object System.Windows.Forms.Radiobutton
+    $IncreasedItemCapacityOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $IncreasedItemCapacityOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($IncreasedItemCapacityOoT, "Increase the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    # Increased Item Capacity (Description)
+    $IncreasedItemCapacityLabel = New-Object System.Windows.Forms.Label
+    $IncreasedItemCapacityLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $IncreasedItemCapacityLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $IncreasedItemCapacityLabel.Text = "Increased Item Capacity"
+    $ToolTip.SetToolTip($IncreasedItemCapacityLabel, "Increase the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    $ItemCapacityPanel.Controls.AddRange(@($ReducedItemCapacityOoT, $NormalItemCapacityOoT, $IncreasedItemCapacityOoT, $ReducedItemCapacityLabel, $NormalItemCapacityLabel, $IncreasedItemCapacityLabel))
+
+    $row = 1
+    $column = 0
 
     # Unlock Kokiri Sword Adult Link (Checkbox)
     $global:UnlockSwordOoT = New-Object System.Windows.Forms.Checkbox
     $UnlockSwordOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $UnlockSwordOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($UnlockSwordOoT)
+    $UnlockSwordOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($UnlockSwordOoT, "Adult Link is able to use the Kokiri Sword`nThe Kokiri Sword does half as much damage as the Master Sword")
     
     # Unlock Kokiri Sword Adult Link (Description)
     $UnlockSwordLabel = New-Object System.Windows.Forms.Label
     $UnlockSwordLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $UnlockSwordLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), (3 + $row * $rowHeight + 3))
+    $UnlockSwordLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), (3 + $row * $rowHeight + 23))
     $UnlockSwordLabel.Text = "Unlock Kokiri Sword"
-    $CheckboxesPanel.Controls.Add($UnlockSwordLabel)
     $ToolTip.SetToolTip($UnlockSwordLabel, "Adult Link is able to use the Kokiri Sword`nThe Kokiri Sword does half as much damage as the Master Sword")
 
-    $column = 3
+    $column = 1
 
+    # Unlock Tunics Child Link (Checkbox)
+    $global:UnlockTunicsOoT = New-Object System.Windows.Forms.Checkbox
+    $UnlockTunicsOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $UnlockTunicsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($UnlockTunicsOoT, "Child Link is able to use the Goron TUnic and Zora Tunic`nSince you might want to walk around in style as well when you are young")
+
+    # Unlock Tunics Child Link (Description)
+    $UnlockTunicsLabel = New-Object System.Windows.Forms.Label
+    $UnlockTunicsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $UnlockTunicsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $UnlockTunicsLabel.Text = "Unlock Tunics"
+    $ToolTip.SetToolTip($UnlockTunicsLabel, "Child Link is able to use the Goron TUnic and Zora Tunic`nSince you might want to walk around in style as well when you are young")
+
+    $column = 2
+
+    # Unlock Boots Child Link (Checkbox)
+    $global:UnlockBootsOoT = New-Object System.Windows.Forms.Checkbox
+    $UnlockBootsOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $UnlockBootsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($UnlockBootsOoT, "Child Link is able to use the Iron Boots and Hover Boots")
+
+    # Unlock Boots Child Link (Description)
+    $UnlockBootsLabel = New-Object System.Windows.Forms.Label
+    $UnlockBootsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $UnlockBootsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $UnlockBootsLabel.Text = "Unlock Boots"
+    $ToolTip.SetToolTip($UnlockBootsLabel, "Child Link is able to use the Iron Boots and Hover Boots")
+
+    $EquipmentBox.Controls.AddRange(@($UnlockSwordOoT, $UnlockTunicsOoT, $UnlockBootsOoT, $UnlockSwordLabel, $UnlockTunicsLabel, $UnlockBootsLabel))
+
+
+
+    # EVERYTHING ELSE #
+
+    $row = 0
+    $column = 0
+
+    # Create a groupbox for the other buttons
+    $OtherBox = New-Object System.Windows.Forms.GroupBox
+    $OtherBox.Size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 2 + $baseY))
+    $OtherBox.Location = New-Object System.Drawing.Size($baseX, ($EquipmentBox.Bottom + 5))
+    $OtherBox.Text = " Other "
+    $OoTReduxOptionsDialog.Controls.Add($OtherBox)
+    
     # Disable Low HP Beep (Checkbox)
     $global:DisableLowHPSoundOoT = New-Object System.Windows.Forms.Checkbox
     $DisableLowHPSoundOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $DisableLowHPSoundOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($DisableLowHPSoundOoT)
+    $DisableLowHPSoundOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($DisableLowHPSoundOoT, "There will be absolute silence when Link's HP is getting low")
 
     # Disable Low HP Beep (Description)
     $DisableLowHPSoundLabel = New-Object System.Windows.Forms.Label
     $DisableLowHPSoundLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $DisableLowHPSoundLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $DisableLowHPSoundLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $DisableLowHPSoundLabel.Text = "Disable Low HP Beep"
-    $CheckboxesPanel.Controls.Add($DisableLowHPSoundLabel)
     $ToolTip.SetToolTip($DisableLowHPSoundLabel, "There will be absolute silence when Link's HP is getting low")
 
-    $row = 3
-    $column = 0
+    $column = 1
+
+    # Require All Medallions for Ganon's Castle (Checkbox)
+    $global:MedallionsOoT = New-Object System.Windows.Forms.Checkbox
+    $MedallionsOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $MedallionsOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($MedallionsOoT, "All six medallions are required for the Rainbow Bridge to appear before Ganon's Castle`The vanilla requirements were the Shadow and Spirit Medallions and the Light Arrows")
+
+    # All Medallions - Ganon's Castle (Description)
+    $MedallionsLabel = New-Object System.Windows.Forms.Label
+    $MedallionsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $MedallionsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $MedallionsLabel.Text = "Require All Medallions"
+    $ToolTip.SetToolTip($MedallionsLabel, "All six medallions are required for the Rainbow Bridge to appear before Ganon's Castle`nThe vanilla requirements were the Shadow and Spirit Medallions and the Light Arrows")
+
+    $column = 2
+
+    # Can Return to Child Before Clearing Forest Temple (Checkbox)
+    $global:ReturnChildOoT = New-Object System.Windows.Forms.Checkbox
+    $ReturnChildOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $ReturnChildOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($ReturnChildOoT, "You can always go back to being a child again before clearing the boss of the Forest Temple`nOut of the way Sheik!")
+
+    # Can Return to Child Before Clearing Forest Temple (Description)
+    $ReturnChildLabel = New-Object System.Windows.Forms.Label
+    $ReturnChildLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $ReturnChildLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $ReturnChildLabel.Text = "Can Always Return"
+    $ToolTip.SetToolTip($ReturnChildLabel, "You can always go back to being a child again before clearing the boss of the Forest Temple`nOut of the way Sheik!")
+
+    $column = 3
 
     # Remove Navi Proximity Prompts (Checkbox)
     $global:DisableNaviOoT = New-Object System.Windows.Forms.Checkbox
     $DisableNaviOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $DisableNaviOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($DisableNaviOoT)
+    $DisableNaviOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($DisableNaviOoT, "Navi will no longer interupt your during the first dungeon with mandatory textboxes")
 
     # Remove Navi Proximity Prompts (Description)
     $DisableNaviLabel = New-Object System.Windows.Forms.Label
     $DisableNaviLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $DisableNaviLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $DisableNaviLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $DisableNaviLabel.Text = "Remove Navi Prompts"
-    $CheckboxesPanel.Controls.Add($DisableNaviLabel)
     $ToolTip.SetToolTip($DisableNaviLabel, "Navi will no longer interupt your during the first dungeon with mandatory textboxes`nThis occurs for example when opening your first door or pushing your first block")
 
-    $column = 1
+    $row = 1
+    $column = 0
 
     # Remove Navi Proximity Prompts (Checkbox)
     $global:HideDPadOoT = New-Object System.Windows.Forms.Checkbox
     $HideDPadOoT.Size = New-Object System.Drawing.Size(20, 20)
-    $HideDPadOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($HideDPadOoT)
+    $HideDPadOoT.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($HideDPadOoT, "Hide the D-Pad icon, while it is still active")
 
     # Remove Navi Proximity Prompts (Description)
     $HideDPadLabel = New-Object System.Windows.Forms.Label
     $HideDPadLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $HideDPadLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $HideDPadLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $HideDPadLabel.Text = "Hide D-Pad Icon"
-    $CheckboxesPanel.Controls.Add($HideDPadLabel)
     $ToolTip.SetToolTip($HideDPadLabel, "Hide the D-Pad icons, while they is still active")
 
+    $OtherBox.Controls.AddRange(@($MedallionsOoT, $ReturnChildOoT, $DisableLowHPSoundOoT, $DisableNaviOoT, $HideDPadOoT, $MedallionsLabel, $ReturnChildLabel, $DisableLowHPSoundLabel, $DisableNaviLabel, $HideDPadLabel))
 
+
+
+    # CLOSE #
 
     # Create a button to hide the dialog.
     $InfoOKButton = New-Object System.Windows.Forms.Button
@@ -3876,7 +3872,22 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     $InfoOKButton.Location = New-Object System.Drawing.Size($ButtonX, ($OoTReduxOptionsDialog.Height - 90))
     $InfoOKButton.Text = 'Close'
     $InfoOKButton.Add_Click({$OoTReduxOptionsDialog.Hide()})
-    $OoTReduxOptionsDialog.Controls.Add($InfoOKButton)
+
+    # Include Redux (Checkbox)
+    $global:IncludeReduxOoT = New-Object System.Windows.Forms.Checkbox
+    $IncludeReduxOoT.Size = New-Object System.Drawing.Size(20, 20)
+    $IncludeReduxOoT.Location = New-Object System.Drawing.Size(($baseX * 2), ($InfoOKButton.Top + 5))
+    $IncludeReduxOoT.Checked = $true
+    $ToolTip.SetToolTip($IncludeReduxOoT, "Include the base REDUX patch`nDisable this option to patch only the vanilla ROM with the above options")
+
+    # Include Redux (Description)
+    $IncludeReduxLabel = New-Object System.Windows.Forms.Label
+    $IncludeReduxLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $IncludeReduxLabel.Location = New-Object System.Drawing.Size(($IncludeReduxOoT.Right), ($IncludeReduxOoT.Top + 3))
+    $IncludeReduxLabel.Text = "Include Redux Patch"
+    $ToolTip.SetToolTip($IncludeReduxLabel, "Include the base REDUX patch`nDisable this option to patch only the vanilla ROM with the above options")
+
+    $OoTReduxOptionsDialog.Controls.AddRange(@($InfoOKButton, $IncludeReduxOoT, $IncludeReduxLabel))
 
 }
 
@@ -3888,7 +3899,7 @@ function CreateMajorasMaskReduxOptionsDialog() {
     # Create the dialog that displays more info.
     $global:MMReduxOptionsDialog = New-Object System.Windows.Forms.Form
     $MMReduxOptionsDialog.Text = $ScriptName
-    $MMReduxOptionsDialog.Size = New-Object System.Drawing.Size(700, 400)
+    $MMReduxOptionsDialog.Size = New-Object System.Drawing.Size(700, 550)
     $MMReduxOptionsDialog.MaximumSize = $MMReduxOptionsDialog.Size
     $MMReduxOptionsDialog.MinimumSize = $MMReduxOptionsDialog.Size
     $MMReduxOptionsDialog.MaximizeBox = $false
@@ -3913,33 +3924,40 @@ function CreateMajorasMaskReduxOptionsDialog() {
     $ToolTip.ReshowDelay = 0
     $ToolTip.ShowAlways = $true
 
+    
+    #$MMReduxOptionsDialog.Show()
+
 
 
     ##############
     # Checkboxex #
     ##############
 
-    $row = 0
-    $column = 0
     $labelWidth = 135
     $labelHeight = 15
-    $baseX = 30
+    $baseX = 15
+    $baseY = 20
     $rowHeight = 30
     $columnWidth = $labelWidth + 20
 
 
 
+    # HERO MODE #
+
     # Create a groupbox for the Hero Mode buttons
     $HeroModeBox = New-Object System.Windows.Forms.GroupBox
-    $HeroModeBox.Location = New-Object System.Drawing.Size(($baseX - 15), 50)
-    $HeroModeBox.size = New-Object System.Drawing.Size(($MMReduxOptionsDialog.Width - 50), ($rowHeight * 4))
+    $HeroModeBox.Size = New-Object System.Drawing.Size(($MMReduxOptionsDialog.Width - 50), ($rowHeight * 3 + $baseY))
+    $HeroModeBox.Location = New-Object System.Drawing.Size($baseX, 50)
     $HeroModeBox.Text = " Hero Mode "
     $MMReduxOptionsDialog.Controls.Add($HeroModeBox)
 
+    $row = 0
+    $column = 0
+
     # Create a panel for the Recovery buttons
     $DamagePanel = New-Object System.Windows.Forms.Panel
-    $DamagePanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 10 + $row * $rowHeight))
-    $DamagePanel.size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), 20)
+    $DamagePanel.Size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), 20)
+    $DamagePanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 5 + $row * $rowHeight))
     $HeroModeBox.Controls.Add($DamagePanel)
 
     # 1X Damage (Checkbox)
@@ -4008,8 +4026,8 @@ function CreateMajorasMaskReduxOptionsDialog() {
 
     # Create a panel for the Recovery buttons
     $RecoveryPanel = New-Object System.Windows.Forms.Panel
-    $RecoveryPanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 10 + $row * $rowHeight))
-    $RecoveryPanel.size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), 20)
+    $RecoveryPanel.Size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), $baseY)
+    $RecoveryPanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 5 + $row * $rowHeight))
     $HeroModeBox.Controls.Add($RecoveryPanel)
 
     # Normal Recovery (Checkbox)
@@ -4073,19 +4091,76 @@ function CreateMajorasMaskReduxOptionsDialog() {
 
     $RecoveryPanel.Controls.AddRange(@($NormalRecoveryMM, $HalfRecoveryMM, $QuarterRecoveryMM, $NoRecoveryMM, $NormalRecoveryLabel, $HalfRecoveryLabel, $QuarterRecoveryLabel, $NoRecoveryLabel))
 
+    <#
+    $row = 2
+    $column = 0
+
+    # Create a panel for the Boss HP buttons
+    $BossHPPanel = New-Object System.Windows.Forms.Panel
+    $BossHPPanel.Size = New-Object System.Drawing.Size(($HeroModeBox.Width - 20), $baseY)
+    $BossHPPanel.Location = New-Object System.Drawing.Size($HeroModeBox.Left, ($labelHeight + 5 + $row * $rowHeight))
+    $HeroModeBox.Controls.Add($BossHPPanel)
+
+    # 1x Boss HP (Checkbox)
+    $global:1xBossHPMM = New-Object System.Windows.Forms.RadioButton
+    $1xBossHPMM.Size = New-Object System.Drawing.Size(20, 20)
+    $1xBossHPMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $1xBossHPMM.Checked = $true
+    $ToolTip.SetToolTip($1xBossHPMM, "Bosses have normal hit points")
+
+    # 1x Boss HP (Description)
+    $1xBossHPLabel = New-Object System.Windows.Forms.Label
+    $1xBossHPLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $1xBossHPLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $1xBossHPLabel.Text = "1x Boss HP"
+    $ToolTip.SetToolTip($1xBossHPLabel, "Bosses have normal hit points")
+
+    $column = 1
+
+    # 2x Boss HP (Checkbox)
+    $global:2xBossHPMM = New-Object System.Windows.Forms.RadioButton
+    $2xBossHPMM.Size = New-Object System.Drawing.Size(20, 20)
+    $2xBossHPMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($2xBossHPMM, "Bosses have double as much hit points")
+
+    # 2x Boss HP (Description)
+    $2xBossHPLabel = New-Object System.Windows.Forms.Label
+    $2xBossHPLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $2xBossHPLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $2xBossHPLabel.Text = "2x Boss HP"
+    $ToolTip.SetToolTip($2xBossHPLabel, "Bosses have double as much hit points")
+
+    $column = 2
+
+    # 3x Boss HP (Checkbox)
+    $global:3xBossHPMM = New-Object System.Windows.Forms.RadioButton
+    $3xBossHPMM.Size = New-Object System.Drawing.Size(20, 20)
+    $3xBossHPMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($3xBossHPMM, "Recovery Hearts will not restore Link's health anymore")
+
+    # 3x Boss HP (Description)
+    $3xBossHPLabel = New-Object System.Windows.Forms.Label
+    $3xBossHPLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $3xBossHPLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $3xBossHPLabel.Text = "3x Boss HP"
+    $ToolTip.SetToolTip($3xBossHPLabel, "Bosses have thrice as much hit points")
+
+    $BossHPPanel.Controls.AddRange(@($1xBossHPMM, $2xBossHPMM, $3xBossHPMM, $1xBossHPLabel, $2xBossHPLabel, $3xBossHPLabel))
+    #>
+
     $row = 3
     $column = 0
 
     # OHKO MODE (Checkbox)
     $global:OHKOModeMM = New-Object System.Windows.Forms.Checkbox
     $OHKOModeMM.Size = New-Object System.Drawing.Size(20, 20)
-    $OHKOModeMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + 15), ($row * $rowHeight - 5))
+    $OHKOModeMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight - $baseY/2))
     $ToolTip.SetToolTip($OHKOModeMM, "Enemies kill Link with just a single hit\`nPrepare too die a lot")
 
     # OKHO Damage (Description)
     $OHKOModeLabel = New-Object System.Windows.Forms.Label
     $OHKOModeLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $OHKOModeLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20 + 15),  ($row * $rowHeight + 3 - 5))
+    $OHKOModeLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20 + $baseX),  ($row * $rowHeight + 3 - $baseY/2))
     $OHKOModeLabel.Text = "OHKO Mode"
     $ToolTip.SetToolTip($OHKOModeLabel, "Enemies kill Link with just a single hit\`nPrepare too die a lot")
 
@@ -4093,22 +4168,38 @@ function CreateMajorasMaskReduxOptionsDialog() {
 
 
 
-    # EVERYTHING ELSE #
-
-    # Create a panel to contain everything for other.
-    $CheckboxesPanel = New-Object System.Windows.Forms.Panel
-    $CheckboxesPanel.Size = New-Object System.Drawing.Size($MMReduxOptionsDialog.Width, 100)
-    $CheckboxesPanel.Location = New-Object System.Drawing.Size($baseX, ($HeroModeBox.Bottom + 15))
-    $MMReduxOptionsDialog.Controls.Add($CheckboxesPanel)
+    # D-PAD #
+    
+    # Create a groupbox for the D-Pad buttons
+    $DPadBox = New-Object System.Windows.Forms.GroupBox
+    $DPadBox.Size = New-Object System.Drawing.Size(($MMReduxOptionsDialog.Width - 50), ($rowHeight * 1 + 20))
+    $DPadBox.Location = New-Object System.Drawing.Size($baseX, ($HeroModeBox.Bottom + 5))
+    $DPadBox.Text = " D-Pad Icons Layout "
+    $MMReduxOptionsDialog.Controls.Add($DPadBox)
 
     $row = 0
     $column = 0
 
     # Create a panel for the D-Pad buttons
     $DPadPanel = New-Object System.Windows.Forms.Panel
-    $DPadPanel.Location = New-Object System.Drawing.Size(0, ($row * $rowHeight))
-    $DPadPanel.size = New-Object System.Drawing.Size($MMReduxOptionsDialog.Width, ($labelHeight + 3))
-    $CheckboxesPanel.Controls.Add($DPadPanel)
+    $DPadPanel.Size = New-Object System.Drawing.Size(($DPadBox.Width - 30), ($DPadBox.Height - 30))
+    $DPadPanel.Location = New-Object System.Drawing.Size($baseX, $baseY)
+    $DPadBox.Controls.Add($DPadPanel)
+
+    # Left D-Pad (Checkbox)
+    $global:LeftDPadMM = New-Object System.Windows.Forms.RadioButton
+    $LeftDPadMM.Size = New-Object System.Drawing.Size(20, 20)
+    $LeftDPadMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($LeftDPadMM, "Show the D-Pad icons on the left side of the HUD")
+
+    # Left D-Pad (Description)
+    $LeftDPadLabel = New-Object System.Windows.Forms.Label
+    $LeftDPadLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $LeftDPadLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $LeftDPadLabel.Text = "Left Side"
+    $ToolTip.SetToolTip($LeftDPadLabel, "Show the D-Pad icons on the left side of the HUD")
+
+    $column = 1
 
     # Right D-Pad (Checkbox)
     $global:RightDPadMM = New-Object System.Windows.Forms.RadioButton
@@ -4121,23 +4212,8 @@ function CreateMajorasMaskReduxOptionsDialog() {
     $RightDPadLabel = New-Object System.Windows.Forms.Label
     $RightDPadLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
     $RightDPadLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
-    $RightDPadLabel.Text = "D-Pad Icon on Right Side"
+    $RightDPadLabel.Text = "Right Side"
     $ToolTip.SetToolTip($RightDPadLabel, "Show the D-Pad icons on the right side of the HUD")
-
-    $column = 1
-
-    # Left D-Pad (Checkbox)
-    $global:LeftDPadMM = New-Object System.Windows.Forms.RadioButton
-    $LeftDPadMM.Size = New-Object System.Drawing.Size(20, 20)
-    $LeftDPadMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
-    $ToolTip.SetToolTip($LeftDPadMM, "Show the D-Pad icons on the left side of the HUD")
-
-    # Left D-Pad (Description)
-    $LeftDPadLabel = New-Object System.Windows.Forms.Label
-    $LeftDPadLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $LeftDPadLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
-    $LeftDPadLabel.Text = "D-Pad Icon on Left Side"
-    $ToolTip.SetToolTip($LeftDPadLabel, "Show the D-Pad icons on the left side of the HUD")
 
     $column = 2
 
@@ -4151,81 +4227,201 @@ function CreateMajorasMaskReduxOptionsDialog() {
     $HideDPadLabel = New-Object System.Windows.Forms.Label
     $HideDPadLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
     $HideDPadLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
-    $HideDPadLabel.Text = "Hide D-Pad Icon"
+    $HideDPadLabel.Text = "Hidden"
     $ToolTip.SetToolTip($HideDPadLabel, "Hide the D-Pad icons, while they are still active")
 
     $DPadPanel.Controls.AddRange(@($RightDPadMM, $LeftDPadMM, $HideDPadMM, $RightDPadLabel, $LeftDPadLabel, $HideDPadLabel))
 
-    $row = 1
+
+
+    # GRAPHICS #
+
+    # Create a groupbox for the Graphics buttons
+    $GraphicsBox = New-Object System.Windows.Forms.GroupBox
+    $GraphicsBox.Size = New-Object System.Drawing.Size(($MMReduxOptionsDialog.Width - 50), ($rowHeight * 1.75))
+    $GraphicsBox.Location = New-Object System.Drawing.Size($baseX, ($DPadBox.Bottom + 5))
+    $GraphicsBox.Text = " Graphics "
+    $MMReduxOptionsDialog.Controls.Add($GraphicsBox)
+
+    $row = 0
     $column = 0
 
     # Increase Extended Draw Distance (Checkbox)
     $global:ExtendedDrawMM = New-Object System.Windows.Forms.Checkbox
     $ExtendedDrawMM.Size = New-Object System.Drawing.Size(20, 20)
-    $ExtendedDrawMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($ExtendedDrawMM)
+    $ExtendedDrawMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($ExtendedDrawMM, "Increases the game's draw distance for objects`nDoes not work on all objects")
     
     # Increase Extended Draw Distance (Description)
     $ExtendedDrawLabel = New-Object System.Windows.Forms.Label
     $ExtendedDrawLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $ExtendedDrawLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $ExtendedDrawLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $ExtendedDrawLabel.Text = "Extended Draw Distance"
-    $CheckboxesPanel.Controls.Add($ExtendedDrawLabel)
     $ToolTip.SetToolTip($ExtendedDrawLabel, "Increases the game's draw distance for objects`nDoes not work on all objects")
 
     $column = 1
 
+    # No Black Bars (Checkbox)
+    $global:BlackBarsMM = New-Object System.Windows.Forms.Checkbox
+    $BlackBarsMM.Size = New-Object System.Drawing.Size(20, 20)
+    $BlackBarsMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($BlackBarsMM, "Removes the black bars shown on the top and bottom of the screen during Z-targeting and cutscenes")
+    
+    # No Black Bars (Description)
+    $BlackBarsLabel = New-Object System.Windows.Forms.Label
+    $BlackBarsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $BlackBarsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $BlackBarsLabel.Text = "No Black Bars"
+    $ToolTip.SetToolTip($BlackBarsLabel, "Removes the black bars shown on the top and bottom of the screen during Z-targeting and cutscenes")
+
+    $column = 2
+
+    # Disable Pixelated Stars (Checkbox)
+    $global:PixelatedStarsMM = New-Object System.Windows.Forms.Checkbox
+    $PixelatedStarsMM.Size = New-Object System.Drawing.Size(20, 20)
+    $PixelatedStarsMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
+    $ToolTip.SetToolTip($PixelatedStarsMM, "Completely disable the stars at night-time, which are pixelated dots and do not have any textures for HD replacement")
+    
+    # Disable Pixelated Stars (Description)
+    $PixelatedStarsLabel = New-Object System.Windows.Forms.Label
+    $PixelatedStarsLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $PixelatedStarsLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
+    $PixelatedStarsLabel.Text = "Disable Pixelated Stars"
+    $ToolTip.SetToolTip($PixelatedStarsLabel, "Completely disable the stars at night-time, which are pixelated dots and do not have any textures for HD replacement")
+
+    $GraphicsBox.Controls.AddRange(@($ExtendedDrawMM, $BlackBarsMM, $PixelatedStarsMM, $ExtendedDrawLabel, $BlackBarsLabel, $PixelatedStarsLabel))
+
+
+
+    # EQUIPMENT #
+
+    # Create a groupbox for the equipment buttons
+    $EquipmentBox = New-Object System.Windows.Forms.GroupBox
+    $EquipmentBox.Size = New-Object System.Drawing.Size(($OoTReduxOptionsDialog.Width - 50), ($rowHeight * 2 + $baseY))
+    $EquipmentBox.Location = New-Object System.Drawing.Size($baseX, ($GraphicsBox.Bottom + 5))
+    $EquipmentBox.Text = " Equipment "
+    $MMReduxOptionsDialog.Controls.Add($EquipmentBox)
+
+    $row = 0
+    $column = 0
+
+    # Create a panel for the Item Capacity buttons
+    $ItemCapacityPanel = New-Object System.Windows.Forms.Panel
+    $ItemCapacityPanel.Size = New-Object System.Drawing.Size(($EquipmentBox.Width - 30), ($EquipmentBox.Height / 2 - 15))
+    $ItemCapacityPanel.Location = New-Object System.Drawing.Size($baseX, $baseY)
+    $EquipmentBox.Controls.Add($ItemCapacityPanel)
+
+    # Reduced Item Capacity (Checkbox)
+    $global:ReducedItemCapacityMM = New-Object System.Windows.Forms.Radiobutton
+    $ReducedItemCapacityMM.Size = New-Object System.Drawing.Size(20, 20)
+    $ReducedItemCapacityMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($ReducedItemCapacityMM, "Decrease the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+    
+    # Reduced Item Capacity (Description)
+    $ReducedItemCapacityLabel = New-Object System.Windows.Forms.Label
+    $ReducedItemCapacityLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $ReducedItemCapacityLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column  + 20), 3)
+    $ReducedItemCapacityLabel.Text = "Reduced Item Capacity"
+    $ToolTip.SetToolTip($ReducedItemCapacityLabel, "Decrease the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    $column = 1
+
+    # Normal Item Capacity (Checkbox)
+    $global:NormalItemCapacityMM = New-Object System.Windows.Forms.Radiobutton
+    $NormalItemCapacityMM.Size = New-Object System.Drawing.Size(20, 20)
+    $NormalItemCapacityMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $NormalItemCapacityMM.Checked = $True
+    $ToolTip.SetToolTip($NormalItemCapacityMM, "Keep the normal amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    # Normal Item Capacity (Description)
+    $NormalItemCapacityLabel = New-Object System.Windows.Forms.Label
+    $NormalItemCapacityLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $NormalItemCapacityLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $NormalItemCapacityLabel.Text = "Normal Item Capacity"
+    $ToolTip.SetToolTip($NormalItemCapacityLabel, "Keep the normal amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    $column = 2
+
+    # Increased Item Capacity (Checkbox)
+    $global:IncreasedItemCapacityMM = New-Object System.Windows.Forms.Radiobutton
+    $IncreasedItemCapacityMM.Size = New-Object System.Drawing.Size(20, 20)
+    $IncreasedItemCapacityMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), 0)
+    $ToolTip.SetToolTip($IncreasedItemCapacityMM, "Increase the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    # Increased Item Capacity (Description)
+    $IncreasedItemCapacityLabel = New-Object System.Windows.Forms.Label
+    $IncreasedItemCapacityLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $IncreasedItemCapacityLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), 3)
+    $IncreasedItemCapacityLabel.Text = "Increased Item Capacity"
+    $ToolTip.SetToolTip($IncreasedItemCapacityLabel, "Increase the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry")
+
+    $ItemCapacityPanel.Controls.AddRange(@($ReducedItemCapacityMM, $NormalItemCapacityMM, $IncreasedItemCapacityMM, $ReducedItemCapacityLabel, $NormalItemCapacityLabel, $IncreasedItemCapacityLabel))
+
+    $row = 1
+    $column = 0
+
     # Permanent Razor Sword (Checkbox)
     $global:RazorSwordMM = New-Object System.Windows.Forms.Checkbox
     $RazorSwordMM.Size = New-Object System.Drawing.Size(20, 20)
-    $RazorSwordMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($RazorSwordMM)
+    $RazorSwordMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($RazorSwordMM, "The Razor Sword won't get destroyed after 100 it`nYou can also keep the Razor Sword when traveling back in time")
 
     # Permanent Razor Sword (Description)
     $RazorSwordLabel = New-Object System.Windows.Forms.Label
     $RazorSwordLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $RazorSwordLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $RazorSwordLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $RazorSwordLabel.Text = "Permanent Razor Sword"
-    $CheckboxesPanel.Controls.Add($RazorSwordLabel)
     $ToolTip.SetToolTip($RazorSwordLabel, "The Razor Sword won't get destroyed after 100 it`nYou can also keep the Razor Sword when traveling back in time")
 
-    $column = 2
+    $EquipmentBox.Controls.AddRange(@($RazorSwordMM, $RazorSwordLabel))
+
+
+
+    # EVERYTHING ELSE #
+
+    # Create a groupbox for the other buttons
+    $OtherBox = New-Object System.Windows.Forms.GroupBox
+    $OtherBox.Size = New-Object System.Drawing.Size(($MMReduxOptionsDialog.Width - 50), ($rowHeight * 1.75))
+    $OtherBox.Location = New-Object System.Drawing.Size($baseX, ($EquipmentBox.Bottom + 5))
+    $OtherBox.Text = " Other "
+    $MMReduxOptionsDialog.Controls.Add($OtherBox)
+
+    $row = 0
+    $column = 0
 
     # Disable Low HP Beep (Checkbox)
     $global:DisableLowHPSoundMM = New-Object System.Windows.Forms.Checkbox
     $DisableLowHPSoundMM.Size = New-Object System.Drawing.Size(20, 20)
-    $DisableLowHPSoundMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($DisableLowHPSoundMM)
+    $DisableLowHPSoundMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($DisableLowHPSoundMM, "There will be absolute silence when Link's HP is getting low")
 
     # Disable Low HP Beep (Description)
     $DisableLowHPSoundLabel = New-Object System.Windows.Forms.Label
     $DisableLowHPSoundLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $DisableLowHPSoundLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $DisableLowHPSoundLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $DisableLowHPSoundLabel.Text = "Disable Low HP Beep"
-    $CheckboxesPanel.Controls.Add($DisableLowHPSoundLabel)
     $ToolTip.SetToolTip($DisableLowHPSoundLabel, "There will be absolute silence when Link's HP is getting low")
 
-    $column = 3
+    $column = 1
 
     # Restore 4th Heart Piece Sound (Checkbox)
     $global:PieceOfHeartSoundMM = New-Object System.Windows.Forms.Checkbox
     $PieceOfHeartSoundMM.Size = New-Object System.Drawing.Size(20, 20)
-    $PieceOfHeartSoundMM.Location = New-Object System.Drawing.Size(($columnWidth * $column), ($row * $rowHeight))
-    $CheckboxesPanel.Controls.Add($PieceOfHeartSoundMM)
+    $PieceOfHeartSoundMM.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX), ($row * $rowHeight + 20))
     $ToolTip.SetToolTip($PieceOfHeartSoundMM, "Restore the sound effect when collecting the fourth Piece of Heart that grants Link a new Heart Container")
 
     # Restore 4th Piece of Heart Sound (Description)
     $PieceOfHeartSoundLabel = New-Object System.Windows.Forms.Label
     $PieceOfHeartSoundLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
-    $PieceOfHeartSoundLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + 20), ($row * $rowHeight + 3))
+    $PieceOfHeartSoundLabel.Location = New-Object System.Drawing.Size(($columnWidth * $column + $baseX + 20), ($row * $rowHeight + 23))
     $PieceOfHeartSoundLabel.Text = "4th Piece of Heart Sound"
-    $CheckboxesPanel.Controls.Add($PieceOfHeartSoundLabel)
     $ToolTip.SetToolTip($PieceOfHeartSoundLabel, "Restore the sound effect when collecting the fourth Piece of Heart that grants Link a new Heart Container")
 
+    $OtherBox.Controls.AddRange(@($DisableLowHPSoundMM, $PieceOfHeartSoundMM, $DisableLowHPSoundLabel, $PieceOfHeartSoundLabel))
 
+
+
+    # CLOSE #
 
     # Create a button to hide the dialog.
     $InfoOKButton = New-Object System.Windows.Forms.Button
@@ -4234,7 +4430,22 @@ function CreateMajorasMaskReduxOptionsDialog() {
     $InfoOKButton.Location = New-Object System.Drawing.Size($ButtonX, ($MMReduxOptionsDialog.Height - 90))
     $InfoOKButton.Text = 'Close'
     $InfoOKButton.Add_Click({$MMReduxOptionsDialog.Hide()})
-    $MMReduxOptionsDialog.Controls.Add($InfoOKButton)
+
+    # Include Redux (Checkbox)
+    $global:IncludeReduxMM = New-Object System.Windows.Forms.Checkbox
+    $IncludeReduxMM.Size = New-Object System.Drawing.Size(20, 20)
+    $IncludeReduxMM.Location = New-Object System.Drawing.Size(($baseX * 2), ($InfoOKButton.Top + 5))
+    $IncludeReduxMM.Checked = $true
+    $ToolTip.SetToolTip($IncludeReduxMM, "Include the base REDUX patch`nDisable this option to patch only the vanilla ROM with the above options")
+
+    # Include Redux (Description)
+    $IncludeReduxLabel = New-Object System.Windows.Forms.Label
+    $IncludeReduxLabel.Size = New-Object System.Drawing.Size($labelWidth, $labelHeight)
+    $IncludeReduxLabel.Location = New-Object System.Drawing.Size(($IncludeReduxMM.Right), ($IncludeReduxMM.Top + 3))
+    $IncludeReduxLabel.Text = "Include Redux Patch"
+    $ToolTip.SetToolTip($IncludeReduxLabel, "Include the base REDUX patch`nDisable this option to patch only the vanilla ROM with the above options")
+
+    $MMReduxOptionsDialog.Controls.AddRange(@($InfoOKButton, $IncludeReduxMM, $IncludeReduxLabel))
 
 }
 
@@ -4699,7 +4910,7 @@ function CreateCreditsDialog() {
     # Create the dialog that displays more info.
     $global:CreditsDialog = New-Object System.Windows.Forms.Form
     $CreditsDialog.Text = $ScriptName
-    $CreditsDialog.Size = New-Object System.Drawing.Size(400, 620)
+    $CreditsDialog.Size = New-Object System.Drawing.Size(400, 730)
     $CreditsDialog.MaximumSize = $creditsDialog.Size
     $CreditsDialog.MinimumSize = $creditsDialog.Size
     $CreditsDialog.MaximizeBox = $false
@@ -4713,6 +4924,22 @@ function CreateCreditsDialog() {
     $CreditsString = $ScriptName + " (" + $Version + ")" + '{0}'
 
     $CreditsString += '{0}'
+    $CreditsString += '--- Ocarina of Time REDUX ---{0}'
+    $CreditsString += '- Maroc, ShadowOne, MattKimura, Roman971, TestRunnerSRL, AmazingAmpharos, Krimtonz, Fig, rlbond86, KevinPal, junglechief{0}'
+
+    $CreditsString += '{0}'
+    $CreditsString += "--- Majora's Mask REDUX ---{0}"
+    $CreditsString += '- Maroc, Saneki{0}'
+
+    $CreditsString += '{0}'
+    $CreditsString += "--- MM Young Link Model for Ocarina of Time ---{0}"
+    $CreditsString += '- slash004, The3Dude{0}'
+
+    $CreditsString += '{0}'
+    $CreditsString += "--- MM Adult Link Model for Ocarina of Time ---{0}"
+    $CreditsString += '- Skilar (https://youtu.be/x6MIeEZIsPw){0}'
+
+    $CreditsString += '{0}'
     $CreditsString += '--- Dawn and Dusk ---{0}'
     $CreditsString += '- Lead Development and Music: Captain Seedy-Eye{0}'
     $CreditsString += '- 64DD Porting: LuigiBlood{0}'
@@ -4720,12 +4947,8 @@ function CreateCreditsDialog() {
     $CreditsString += '- Testers:  Captain Seedy, LuigiBlood, Hard4Games, ZFG, Dry4Haz, Fig{0}'
 
     $CreditsString += '{0}'
-    $CreditsString += '--- Ocarina of Time REDUX ---{0}'
-    $CreditsString += '- Maroc, ShadowOne, MattKimura, Roman971, TestRunnerSRL, AmazingAmpharos, Krimtonz, Fig, rlbond86, KevinPal, junglechief{0}'
-
-    $CreditsString += '{0}'
-    $CreditsString += "--- Majora's Mask REDUX ---{0}"
-    $CreditsString += '- Maroc, Saneki{0}'
+    $CreditsString += '--- The Fate of the Bombiwa ---{0}'
+    $CreditsString += 'DezZiBao{0}'
 
     $CreditsString += '{0}'
     $CreditsString += "--- Majora's Mask: Masked Quest ---{0}"
@@ -4795,7 +5018,10 @@ CreateImages
 
 # Create the dialogs to show to the user.
 CreateMainDialog
-SetOcarinaOfTimeModeActive
+ChangeGameMode -Mode "Ocarina of Time"
+
+# Disable patching buttons
+EnablePatchButtons -Enable $false
 
 CreateOcarinaOfTimeReduxOptionsDialog
 CreateMajorasMaskReduxOptionsDialog
@@ -4806,9 +5032,6 @@ CreateInfoSuperMario64Dialog
 CreateInfoPaperMarioDialog
 CreateInfoFreeDialog
 CreateCreditsDialog
-
-# Disable patching buttons
-EnablePatchButtons -Enable $false
 
 # Show the dialog to the user.
 $MainDialog.ShowDialog() | Out-Null
