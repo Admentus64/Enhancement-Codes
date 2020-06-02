@@ -1,3 +1,18 @@
+02-06-2020
+- Reduced the code with 1500 lines
+- Several GUI fixes
+- Several bug fixes
+- Restructured Credits
+- Free Mode patching, Patch VC Emulator or Extract ROM no longer checkes for the GameID of a WAD File
+- Warn when extract Majora's Mask or Paper Mario ROM in a different mode
+- Place extracted ROM in same folder as the provided WAD file
+- Inform is extract was successful
+- Fixed patching ROM Files in Nintendo 64 mode with compressed BPS patches
+- Fixed being able to ignore patching if no BPS patch was provided (Patch Redux without Base Redux Patch)
+- Disabled several options for REDUX is the Base Redux Patch is left unchecked
+- Stop patching beyond the Virtual Console emulator in Patch VC Emulator mode
+- Added more Redux options
+
 01-06-2020
 - Fixed Majora's Mask's REDUX option not being able to patch
 
