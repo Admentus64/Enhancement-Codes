@@ -19,7 +19,7 @@ Add-Type -AssemblyName 'System.Drawing'
 #==============================================================================================================================================================================================
 # Setup global variables
 
-$global:Version = "01-06-2020"
+$global:Version = "05-06-2020"
 
 $global:GameID = ""
 $global:ChannelTitle = ""
@@ -29,6 +29,7 @@ $global:GetCommand = $null
 $global:IsCompress = $false
 $global:IsRedux = $False
 $global:IsWiiVC = $True
+$global:IsDowngrade = $False
 $global:PatchedFileName = ""
 $global:CheckHashSum = ""
 $global:CurrentModeFont = [System.Drawing.Font]::new("Microsoft Sans Serif", 12, [System.Drawing.FontStyle]::Bold)
@@ -49,6 +50,17 @@ $global:HashSum_pp = "9EC6D2A5C2FCA81AB86312328779FD042B5F3B920BF65DF9F6B87B3768
 
 
 #==============================================================================================================================================================================================
+# Default GameID's
+
+$global:OoT_US_GameID = "NACE"
+$global:MM_US_GameID = "NARE"
+$global:SM64_US_GameID = "NAAE"
+$global:PP_US_GameID = "NAEE"
+$global:CUST_GameID = "CUST"
+
+
+
+#==============================================================================================================================================================================================
 # Set file paths
 
 # The path this script is found in.
@@ -61,7 +73,9 @@ else {
 }
 
 # Set the master path to where the files will be located.
-$global:MasterPath = $BasePath + '\Files'
+$global:MasterPath = $BasePath + "\Files"
+$global:IconsPath = $MasterPath + "\Icons"
+$global:WiiVCPath = $MasterPath + "\Wii VC"
 
 
 
@@ -82,7 +96,7 @@ $global:DecompressedROMFile = $null
 #==============================================================================================================================================================================================
 # Import code
 
-Import-Module -Name ($BasePath + '\Extension.psm1')
+#Import-Module -Name ($BasePath + '\Extension.psm1')
 
 
 
@@ -136,71 +150,12 @@ function ExtendString([string]$InputString, [int]$Length) {
 
 
 #==============================================================================================================================================================================================
-<#
-function PrintHexArray([byte[]]$ByteArray) {
-
-    # Initial Values
-    $Offset = $Loop  = 0
-    $String = $Extra = ''
-
-    # Create a header
-    Write-Host ' ------------------------------------------------------------------------------'
-    Write-Host ' Offset      00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F'
-    Write-Host ' ------------------------------------------------------------------------------'
-
-    # Loop through each value in the byte array.
-    foreach($Value in $ByteArray) {
-        # Convert the value to a hex value.
-        $Character = ('{0:X}' -f $Value)
-
-        # Make sure it's at least 2 digits long for alignment.
-        if ($Character.Length -lt 2) {
-            $Character = '0' + $Character
-        }
-
-        # Update the string with the current characters.
-        $String += ($Character + ' ')
-
-        # Add the character to the "Extra" string if it's a valid ASCII format.
-        # If it's a value that makes PowerShell freak out, just make it a period.
-        if (($Value -gt 32) -and ($Value -lt 126)) {
-            $Extra += [char][byte]$Value } else { $Extra += '.'
-        }
-
-        # If we haven't stored at least 16 digits, just keep adding up for now.
-        if ($Loop -lt 15) {
-            $Loop++
-        }
-
-        # If 16 digits have been reached.
-        else {
-        # Write the line of values.
-        Write-Host ((' ' + '{0:X8}' -f $Offset) + ' :: ' + $String + '  ' + $Extra)
-
-        # Reset the values and start counting again.
-        $String = $Extra = ''
-        $Loop = 0
-        $Offset += 16
-        }
-    }
-
-    # If there are any leftovers, write it out.
-    if ($String -ne '') {
-        $FinalString = ((' ' + '{0:X8}' -f $Offset) + ' :: ' + $String)
-        Write-Host ((ExtendString -InputString $FinalString -Length 61) + '  ' + $Extra)
-    }
-
-}
-#>
-
-
-
-#==============================================================================================================================================================================================
 function MainFunctionReset([string]$Command, [string]$Hash, [boolean]$Compress) {
     
     $global:GetCommand = $Command
     $global:IsCompress = $Compress
     $global:IsRedux = $False
+    $global:IsDowngrade = $False
     $global:PatchFile = $null
     $global:PatchedFileName = "_patched"
     $global:CheckHashSum = $Hash
@@ -208,8 +163,11 @@ function MainFunctionReset([string]$Command, [string]$Hash, [boolean]$Compress) 
     if (!$IsWiiVC)                                                                  { $global:Z64File = SetZ64Parameters -Z64Path $GameZ64 }
     if (!(CheckCheckBox -CheckBox $InputCustomGameIDCheckbox))                      { ChangeGameMode -Mode $GameType }
 
-    if ($IsWiiVC -and $GetCommand -eq "Downgrade" -and $PatchVCDowngrade.Visible)   { $PatchVCDowngrade.Checked = $True }
-    elseif ($GetCommand -eq "No Downgrade")                                         { $PatchVCDowngrade.Checked = $False }
+    if ($IsWiiVC -and $GetCommand -eq "Downgrade" -and $PatchVCDowngrade.Visible) {
+        $PatchVCDowngrade.Checked = $True
+        $global:IsDowngrade = $True
+    }
+    elseif ($IsWiiVC -and $GetCommand -eq "No Downgrade") { $PatchVCDowngrade.Checked = $False }
 
     SetROMFile
 
@@ -227,14 +185,15 @@ function MainFunctionOoTRedux([string]$Command, [string]$Hash, [boolean]$Compres
     $PatchedFileName = '_redux_patched'
     $IsRedux = $true
 
+    # Set paths to all the files stored in the script.
+    $global:Files = SetFileParameters
+
     $PatchVCExpandMemory.Checked = $true
     $PatchVCRemapDPad.Checked = $true
-    $PatchVCDowngrade.Checked = $true
-
-    if ($IsWiiVC -and !$PatchVCRemapCDown.Checked -and !$PatchVCRemapZ.Checked) { $PatchVCLeaveDPadUp.Checked = $true }
-    if ($IncludeReduxOoT.Checked) { $PatchFile = $Files.bpspatch_oot_redux }
-    else { $PatchFile = $null }
-
+    if ($IsWiiVC -and !$PatchVCRemapCDown.Checked -and !$PatchVCRemapZ.Checked)   { $PatchVCLeaveDPadUp.Checked = $true }
+    if ($IncludeReduxOoT.Checked)                                                 { $global:PatchFile = $Files.bpspatch_oot_redux }
+    else { $global:PatchFile = $null }
+    
     MainFunction
 
 }
@@ -251,9 +210,11 @@ function MainFunctionMMRedux([string]$Command, [string]$Hash, [boolean]$Compress
     $PatchedFileName = '_redux_patched'
     $IsRedux = $true
 
-    if ($IncludeReduxMM.Checked) { $PatchFile = $Files.bpspatch_mm_redux }
-    else { $PatchFile = $null }
+    # Set paths to all the files stored in the script.
+    $global:Files = SetFileParameters
 
+    if ($IncludeReduxMM.Checked) { $global:PatchFile = $Files.bpspatch_mm_redux }
+    else { $global:PatchFile = $null }
     $PatchVCRemapDPad.Checked = $true
 
     MainFunction
@@ -276,10 +237,13 @@ function MainFunctionPatchRemap([String]$Command, [string]$Id, [string]$Title, [
 function MainFunctionPatch([String]$Command, [string]$Id, [string]$Title, [string]$Patch, [string]$PatchedFile, [string]$Hash, [Boolean]$Compress) {
     
     MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
+    
+    # Set paths to all the files stored in the script.
+    $global:Files = SetFileParameters
 
-    $GameID = $Id
-    $ChannelTitle = $Title
-    $PatchFile = $Patch
+    if ($GameID -ne $null)         { $global:GameID = $Id }
+    if ($ChannelTitle -ne $null)   { $global:ChannelTitle = $Title }
+    $global:PatchFile = $Patch
     $PatchedFileName = $PatchedFile
 
     MainFunction
@@ -290,124 +254,139 @@ function MainFunctionPatch([String]$Command, [string]$Id, [string]$Title, [strin
 
 #==============================================================================================================================================================================================
 function MainFunction() {
-
+    
     # Step 01: Disable the main dialog, allow patching and delete files if they still exist.
-    DeleteAllFiles
     $ContinuePatching = $True
     $MainDialog.Enabled = $False
-
-    # Step 02: Create all the files.
-    CreateFiles -Path $MasterPath
 
     # Only continue with these steps in VC WAD mode. Otherwise ignore these steps.
     if ($IsWiiVC) {
         
-        # Step 03: Extract the contents of the WAD file.
+        # Step 02: Extract the contents of the WAD file.
         ExtractWADFile
 
-        # Step 04: Check the GameID to be vanilla.
+        # Step 03: Check the GameID to be vanilla.
         $ContinuePatching = CheckGameID
         if (!$ContinuePatching) {
-            DeleteAllFiles
+            Cleanup
             return
         }
 
-        # Step 05: Replace the Virtual Console emulator within the WAD file.
+        # Step 04: Replace the Virtual Console emulator within the WAD file.
         PatchVCEmulator
-        if ($GetCommand -eq "Patch VC") {
-            DeleteAllFiles
-            return
-        }
 
-        # Step 06: Extract "00000005.app" file to get the ROM.
+        # Step 05: Extract "00000005.app" file to get the ROM.
         ExtractU8AppFile
 
-        # Step 07: Do some initial patching stuff for the ROM for VC WAD files.
+        # Step 06: Do some initial patching stuff for the ROM for VC WAD files.
         $ContinuePatching = PatchVCROM
         if (!$ContinuePatching) {
-            DeleteAllFiles
+            Cleanup
             return
         }
+
     }
 
-    # Step 08: Downgrade the ROM if required
+    # Step 07: Downgrade the ROM if required
     $ContinuePatching = DowngradeROM
     if (!$ContinuePatching) {
-        DeleteAllFiles
+        Cleanup
         return
     }
 
-    # Step 09: Compare HashSums for untouched ROM Files
+    # Step 08: Compare HashSums for untouched ROM Files
     $ContinuePatching = CompareHashSums
     if (!$ContinuePatching) {
-        DeleteAllFiles
+        Cleanup
         return
     }
 
-    # Step 10: Decompress the ROM if required.
+    # Step 09: Decompress the ROM if required.
     DecompressROM
 
-    # Step 11: Patch and extend the ROM file with the patch through Floating IPS.
+    # Step 10: Patch and extend the ROM file with the patch through Floating IPS.
     $ContinuePatching = PatchROM
     if (!$ContinuePatching) {
-        DeleteAllFiles
+        Cleanup
         return
     }
 
-    # Step 12: Apply additional patches on top of the Redux patches.
+    # Step 11: Apply additional patches on top of the Redux patches.
     PatchRedux
 
-    # Step 13: Compress the decompressed ROM if required.
+    # Step 12: Compress the decompressed ROM if required.
     CompressROM
 
     # Only continue with these steps in VC WAD mode. Otherwise ignore these steps.
     if ($IsWiiVC) {
-        # Step 14: Extend a ROM if it is neccesary for the Virtual Console. Mostly applies to decompressed ROMC files
+        # Step 13: Extend a ROM if it is neccesary for the Virtual Console. Mostly applies to decompressed ROMC files
         ExtendROM
 
-        # Step 15: Compress the ROMC again if possible.
+        # Step 14: Compress the ROMC again if possible.
         CompressROMC
 
-        # Step 16: Apply Custom Channel Title and GameID if enabled.
+        # Step 15: Apply Custom Channel Title and GameID if enabled.
         SetCustomGameID
 
-        # Step 17: Hack the Channel Title.
+        # Step 16: Hack the Channel Title.
         HackOpeningBNRTitle
 
-        # Step 18: Repack the "00000005.app" with the updated ROM file.
+        # Step 17: Repack the "00000005.app" with the updated ROM file.
         RepackU8AppFile
 
-        # Step 19: Repack the WAD file with the updated APP file.
+        # Step 18: Repack the WAD file with the updated APP file.
         RepackWADFile
     }
 
-    # Step 20: Final message.
+    # Step 19: Final message.
     if ($IsWiiVC)   { UpdateStatusLabelDuringPatching -Text ('Finished patching the ' + $GameType + ' VC WAD file.') }
     else            { UpdateStatusLabelDuringPatching -Text ('Finished patching the ' + $GameType + ' ROM file.') }
 
-    # Step 21: Get rid of everything and enable the main dialog.
-    DeleteAllFiles
+    # Step 20: Get rid of everything and enable the main dialog.
+    Cleanup
 
 }
 
 
 
 #==============================================================================================================================================================================================
-function DeleteAllFiles() {
+function Cleanup() {
     
-    RemovePath -LiteralPath $MasterPath
-    RemovePath -LiteralPath ($BasePath + '\cygdrive')
+    RemovePath -LiteralPath ($MasterPath + '\cygdrive')
 
-    if ($IsWiiCC) { RemovePath -LiteralPath $WADFile.Folder }
+    if ($IsWiiVC) {
+        RemovePath -LiteralPath $WADFile.Folder
+        DeleteFile -File $Files.ckey
+        DeleteFile -File ($WiiVCPath + "\00000000.app")
+        DeleteFile -File ($WiiVCPath + "\00000001.app")
+        DeleteFile -File ($WiiVCPath + "\00000002.app")
+        DeleteFile -File ($WiiVCPath + "\00000003.app")
+        DeleteFile -File ($WiiVCPath + "\00000004.app")
+        DeleteFile -File ($WiiVCPath + "\00000005.app")
+        DeleteFile -File ($WiiVCPath + "\00000006.app")
+        DeleteFile -File ($WiiVCPath + "\00000007.app")
+        DeleteFile -File ($WiiVCPath + "\" + $WADFile.FolderName + ".cert")
+        DeleteFile -File ($WiiVCPath + "\" + $WADFile.FolderName + ".tik")
+        DeleteFile -File ($WiiVCPath + "\" + $WADFile.FolderName + ".tmd")
+        DeleteFile -File ($WiiVCPath + "\" + $WADFile.FolderName + ".trailer")
+    }
 
-    if ($IsRedux) {
-        if (Test-Path dmaTable.dat -PathType leaf) { Remove-Item dmaTable.dat }
-        if (Test-Path ARCHIVE.bin -PathType leaf) { Remove-Item ARCHIVE.bin }
+    if ($IsCompress) {
+        DeleteFile -File "dmaTable.dat"
+        DeleteFile -File "ARCHIVE.bin"
     }
 
     $MainDialog.Enabled = $True
 
+    if ($Files -ne $Null) { $global:Files = $Null }
+    [System.GC]::Collect()
+
 }
+
+
+
+#==============================================================================================================================================================================================
+function DeleteFile([string]$File) { if (Test-Path $File -PathType leaf) { Remove-Item $File } }
 
 
 
@@ -422,6 +401,25 @@ function RemovePath([string]$LiteralPath) {
             Remove-Item -LiteralPath $LiteralPath -Recurse -Force -ErrorAction 'SilentlyContinue' | Out-Null
         }
     }
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function CreatePath([string]$LiteralPath) {
+    
+    # Make sure the path isn't null to avoid errors.
+    if ($LiteralPath -ne '') {
+        # Check to see if the path does not exist.
+        if (!(Test-Path -LiteralPath $LiteralPath)) {
+            # Create the path.
+            New-Item -Path $LiteralPath -ItemType 'Directory' | Out-Null
+        }
+    }
+
+    # Return the path so it can be set to a variable when creating.
+    return $LiteralPath
 
 }
 
@@ -465,6 +463,28 @@ function Get-FileName([string]$Path, [string[]]$Description, [string[]]$FileName
 
 
 
+#==================================================================================================================================================================================================================================================================
+function SetIconParameters() {
+    
+    # Create a hash table.
+    $Icons = @{}
+
+    # Store all files by their name.
+    $Icons.V        = $IconsPath + "\V.ico"
+
+    $Icons.Mario1   = $IconsPath + "\Mario1.ico"
+    $Icons.Mario2   = $IconsPath + "\Mario2.ico"
+
+    $Icons.Zelda1   = $IconsPath + "\Zelda1.ico"
+    $Icons.Zelda2   = $IconsPath + "\Zelda2.ico"
+    $Icons.Zelda3   = $IconsPath + "\Zelda3.ico"
+
+    return $Icons
+
+}
+
+
+
 #==============================================================================================================================================================================================
 function SetFileParameters() {
     
@@ -472,51 +492,87 @@ function SetFileParameters() {
     $Files = @{}
 
     # Store all files by their name.
-
-    $Files.ckey                          = $MasterPath + "\common-key.bin"
-    $Files.Compress                      = $MasterPath + "\Compress.exe"
-    $Files.cygcrypto                     = $MasterPath + "\cygcrypto-0.9.8.dll"
-    $Files.cyggccs1                      = $MasterPath + "\cyggcc_s-1.dll"
-    $Files.cygncursesw10                 = $MasterPath + "\cygncursesw-10.dll"
-    $Files.cygpng1616                    = $MasterPath + "\cygpng16-16.dll"
-    $Files.cygwin1                       = $MasterPath + "\cygwin1.dll"
-    $Files.cygz                          = $MasterPath + "\cygz.dll"
-    $Files.flips                         = $MasterPath + "\flips.exe"
-    $Files.lzss                          = $MasterPath + "\lzss.exe"
-    $Files.ndec                          = $MasterPath + "\ndec.exe"
-    $Files.romc                          = $MasterPath + "\romc.exe"
-    $Files.romchu                        = $MasterPath + "\romchu.exe"
-    $Files.TabExt                        = $MasterPath + "\TabExt.exe"
-    $Files.wadpacker                     = $MasterPath + "\wadpacker.exe"
-    $Files.wadunpacker                   = $MasterPath + "\wadunpacker.exe"
-    $Files.wszst                         = $MasterPath + "\wszst.exe"
+    $Files.flips                             = $MasterPath + "\Base\flips.exe"
     
-    $Files.bpspatch_mm_masked_quest      = $MasterPath + "\mm_masked_quest.bps"
-    $Files.bpspatch_mm_pol               = $MasterPath + "\mm_pol.bps"
-    $Files.bpspatch_mm_redux             = $MasterPath + "\mm_redux.bps"
-    $Files.bpspatch_mm_rus               = $MasterPath + "\mm_rus.bps"
-
-    $Files.bpspatch_oot_bombiwa          = $MasterPath + "\oot_bombiwa.bps"
-    $Files.bpspatch_oot_chi              = $MasterPath + "\oot_chi.bps"
-    $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\oot_dawn_rev0.bps"
-    $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\oot_dawn_rev1.bps"
-    $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\oot_dawn_rev2.bps"
-    $Files.bpspatch_oot_models_mm        = $MasterPath + "\oot_models_mm.bps"
-    $Files.bpspatch_oot_pol              = $MasterPath + "\oot_pol.bps"
-    $Files.bpspatch_oot_redux            = $MasterPath + "\oot_redux.bps"
-    $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\oot_rev1_to_rev0.bps"
-    $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\oot_rev2_to_rev0.bps"
-    $Files.bpspatch_oot_rus              = $MasterPath + "\oot_rus.bps"
-    $Files.bpspatch_oot_spa              = $MasterPath + "\oot_spa.bps"
+    if ($IsWiiVC) {
+        $Files.wadpacker                     = $MasterPath + "\Wii VC\wadpacker.exe"
+        $Files.wadunpacker                   = $MasterPath + "\Wii VC\wadunpacker.exe"
+        $Files.wszst                         = $MasterPath + "\Wii VC\wszst.exe"
+        $Files.ckey                          = $MasterPath + "\Wii VC\common-key.bin"
     
-    $Files.bpspatch_pp_hard_mode         = $MasterPath + "\pp_hard_mode.bps"
-    $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\pp_hard_mode_plus.bps"
-    $Files.bpspatch_pp_insane_mode       = $MasterPath + "\pp_insane_mode.bps"
+        $Files.cygcrypto                     = $MasterPath + "\Wii VC\cygcrypto-0.9.8.dll"
+        $Files.cyggccs1                      = $MasterPath + "\Wii VC\cyggcc_s-1.dll"
+        $Files.cygncursesw10                 = $MasterPath + "\Wii VC\cygncursesw-10.dll"
+        $Files.cygpng1616                    = $MasterPath + "\Wii VC\cygpng16-16.dll"
+        $Files.cygwin1                       = $MasterPath + "\Wii VC\cygwin1.dll"
+        $Files.cygz                          = $MasterPath + "\Wii VC\cygz.dll"
+    }
+    
+    if ($IsCompress) {
+        $Files.ndec                          = $MasterPath + "\Compress\ndec.exe"
+        $Files.TabExt                        = $MasterPath + "\Compress\TabExt.exe"
+        $Files.Compress                      = $MasterPath + "\Compress\Compress.exe"
+    }
 
-    $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\sm64_appFile_01.bps"
-    $Files.bpspatch_sm64_cam             = $MasterPath + "\sm64_cam.bps"
-    $Files.bpspatch_sm64_fps             = $MasterPath + "\sm64_fps.bps"
-    $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\sm64_multiplayer.bps"
+    if ($GameType -eq "Majora's Mask") {
+        $Files.lzss                          = $MasterPath + "\Wii VC\lzss.exe"
+        $Files.romchu                        = $MasterPath + "\Wii VC\romchu.exe"
+    }
+
+    if ($GameType -eq "Majora's Mask" -and !$IsCompress) {
+        $Files.bpspatch_mm_masked_quest      = $MasterPath + "\Majora's Mask\mm_masked_quest.bps"
+        $Files.bpspatch_mm_rus               = $MasterPath + "\Majora's Mask\mm_rus.bps"
+        
+    }
+
+    if ($GameType -eq "Majora's Mask" -and $IsCompress) {
+        $Files.bpspatch_mm_pol               = $MasterPath + "\Majora's Mask\mm_pol.bps"
+    }
+
+    if ($GameType -eq "Majora's Mask" -and $IsRedux) {
+        $Files.bpspatch_mm_redux             = $MasterPath + "\Majora's Mask\mm_redux.bps"
+    }
+
+    if ($GameType -eq "Ocarina of Time" -and !$IsCompress) {
+        $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\Ocarina of Time\oot_dawn_rev0.bps"
+        $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\Ocarina of Time\oot_dawn_rev1.bps"
+        $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\Ocarina of Time\oot_dawn_rev2.bps"
+        $Files.bpspatch_oot_rus              = $MasterPath + "\Ocarina of Time\oot_rus.bps"
+        
+    }
+
+    if ($GameType -eq "Ocarina of Time" -and $IsCompress) {
+        $Files.bpspatch_oot_bombiwa          = $MasterPath + "\Ocarina of Time\oot_bombiwa.bps"
+        $Files.bpspatch_oot_chi              = $MasterPath + "\Ocarina of Time\oot_chi.bps"
+        $Files.bpspatch_oot_pol              = $MasterPath + "\Ocarina of Time\oot_pol.bps"
+        $Files.bpspatch_oot_spa              = $MasterPath + "\Ocarina of Time\oot_spa.bps"
+    }
+
+    if ($GameType -eq "Ocarina of Time" -and $IsDowngrade) {
+        $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev1_to_rev0.bps"
+        $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev2_to_rev0.bps"
+    }
+
+    if ($GameType -eq "Ocarina of Time" -and $IsRedux) {
+        $Files.bpspatch_oot_redux            = $MasterPath + "\Ocarina of Time\oot_redux.bps"
+        $Files.bpspatch_oot_models_mm        = $MasterPath + "\Ocarina of Time\oot_models_mm.bps"
+        $Files.bpspatch_oot_widescreen       = $MasterPath + "\Ocarina of Time\oot_widescreen.bps"
+    }
+    
+    if ($GameType -eq "Paper Mario") {
+        $Files.romc                          = $MasterPath + "\Wii VC\romc.exe"
+
+        $Files.bpspatch_pp_hard_mode         = $MasterPath + "\Paper Mario\pp_hard_mode.bps"
+        $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\Paper Mario\pp_hard_mode_plus.bps"
+        $Files.bpspatch_pp_insane_mode       = $MasterPath + "\Paper Mario\pp_insane_mode.bps"
+    }
+
+    if ($GameType -eq "Super Mario 64") {
+        $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\Super Mario 64\sm64_appFile_01.bps"
+        $Files.bpspatch_sm64_cam             = $MasterPath + "\Super Mario 64\sm64_cam.bps"
+        $Files.bpspatch_sm64_fps             = $MasterPath + "\Super Mario 64\sm64_fps.bps"
+        $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\Super Mario 64\sm64_multiplayer.bps"
+    }
 
     # Set it to a global value.
     return $Files
@@ -535,26 +591,27 @@ function SetWADParameters([string]$WADPath, [string]$FolderName) {
     $WADItem = Get-Item -LiteralPath $WADPath
     
     # Store some stuff about the WAD that I'll probably reference.
-    $WADFile.Name      = $WADItem.BaseName
-    $WADFile.Path      = $WADItem.DirectoryName
-    $WADFile.Folder    = $WADFile.Path + '\' + $FolderName
+    $WADFile.Name         = $WADItem.BaseName
+    $WADFile.Path         = $WADItem.DirectoryName
+    $WADFile.Folder       = $WADFile.Path + '\' + $FolderName
+    $WADFile.FolderName   = $FolderName
 
-    $WADFile.AppFile00 = $WADFile.Folder + '\00000000.app'
-    $WADFile.AppPath00 = $WADFile.Folder + '\00000000'
-    $WADFile.AppFile01 = $WADFile.Folder + '\00000001.app'
-    $WADFile.AppPath01 = $WADFile.Folder + '\00000001'
-    $WADFile.AppFile05 = $WADFile.Folder + '\00000005.app'
-    $WADFile.AppPath05 = $WADFile.Folder + '\00000005'
+    $WADFile.AppFile00    = $WADFile.Folder + '\00000000.app'
+    $WADFile.AppPath00    = $WADFile.Folder + '\00000000'
+    $WADFile.AppFile01    = $WADFile.Folder + '\00000001.app'
+    $WADFile.AppPath01    = $WADFile.Folder + '\00000001'
+    $WADFile.AppFile05    = $WADFile.Folder + '\00000005.app'
+    $WADFile.AppPath05    = $WADFile.Folder + '\00000005'
 
-    $WADFile.cert      = $WADFile.Folder + '\' + $FolderName + '.cert'
-    $WADFile.tik       = $WADFile.Folder + '\' + $FolderName + '.tik'
-    $WADFile.tmd       = $WADFile.Folder + '\' + $FolderName + '.tmd'
-    $WADFile.trailer   = $WADFile.Folder + '\' + $FolderName + '.trailer'
+    $WADFile.cert         = $WADFile.Folder + '\' + $FolderName + '.cert'
+    $WADFile.tik          = $WADFile.Folder + '\' + $FolderName + '.tik'
+    $WADFile.tmd          = $WADFile.Folder + '\' + $FolderName + '.tmd'
+    $WADFile.trailer      = $WADFile.Folder + '\' + $FolderName + '.trailer'
     
     if ($gameType -eq "Majora's Mask" -or $gameType -eq "Paper Mario")   { $WADFile.ROMFile = $WADFile.AppPath05 + '\romc' }
     else                                                                 { $WADFile.ROMFile = $WADFile.AppPath05 + '\rom' }
-    $WADFile.Patched   = $WADFile.Path + '\' + $WADFile.Name + $PatchedFileName + '.wad'
-    $WADFile.Extracted = $WADFile.Path + '\' + $WADFile.Name + "_extracted_rom" + '.z64'
+    $WADFile.Patched      = $WADFile.Path + '\' + $WADFile.Name + $PatchedFileName + '.wad'
+    $WADFile.Extracted    = $WADFile.Path + '\' + $WADFile.Name + "_extracted_rom" + '.z64'
 
     SetROMFile
 
@@ -562,7 +619,6 @@ function SetWADParameters([string]$WADPath, [string]$FolderName) {
     return $WADFile
 
 }
-
 
 
 
@@ -615,15 +671,23 @@ function ExtractWADFile() {
     
     # Set the status label.
     UpdateStatusLabelDuringPatching -Text 'Extracting WAD file...'
-    
-    # We need to be in the same path as some files so just jump there.
-    Push-Location $MasterPath
 
+    # We need to be in the same path as some files so just jump there.
+    Push-Location $WiiVCPath
+
+    if (!(Test-Path $Files.ckey -PathType Leaf)) {
+        $ByteArray = @(235, 228, 42, 34, 94, 133, 147, 228, 72, 217, 197, 69, 115, 129, 170, 247)
+        [io.file]::WriteAllBytes($Files.ckey, $ByteArray) | Out-Null
+    }
+    
     # Run the program to extract the wad file.
-    & $Files.wadunpacker $GameWAD # | Out-Host
+    $ErrorActionPreference = 'SilentlyContinue'
+    try   { & $Files.wadunpacker $GameWAD | Out-Null }
+    catch { }
+    $ErrorActionPreference = 'Continue'
 
     # Find the extracted folder by looping through all files in the folder.
-    foreach($Folder in Get-ChildItem -LiteralPath $MasterPath -Force) {
+    foreach($Folder in Get-ChildItem -LiteralPath $WiiVCPath -Force) {
         # There will only be one folder, the one we want.
         if ($Folder.PSIsContainer) {
             # Remember the path to this folder.
@@ -651,7 +715,7 @@ function ExtractU8AppFile() {
     UpdateStatusLabelDuringPatching -Text 'Extracting "00000005.app" file...'
     
     # Unpack the file using wszst.
-    & $Files.wszst 'X' $WADFile.AppFile05 '-d' $WADFile.AppPath05 # | Out-Host
+    & $Files.wszst 'X' $WADFile.AppFile05 '-d' $WADFile.AppPath05
 
     # Remove all .T64 files when selected
     if ($PatchVCRemoveT64.Checked) {
@@ -784,6 +848,8 @@ function PatchVCEmulator() {
 #==============================================================================================================================================================================================
 function PatchVCROM() {
     
+    if ($GetCommand -eq "Patch VC") { return $True }
+
     # Set the status label.
     UpdateStatusLabelDuringPatching -Text ("Initial patching of " + $GameType + " ROM...")
     
@@ -832,11 +898,11 @@ function PatchVCROM() {
 
 #==============================================================================================================================================================================================
 function DowngradeROM() {
+    
+    if ($GetCommand -eq "Inject") { return $True }
 
     # Downgrade a ROM if it is required first
-    if ($GameType -eq "Ocarina of Time" -and $PatchVCDowngrade.Checked) {
-
-        Write-Host "Downgrading"
+    if ($GameType -eq "Ocarina of Time" -and $IsDowngrade) {
 
         $HashSum = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
         if ($HashSum -ne $HashSum_oot_rev1 -and $HashSum -ne $HashSum_oot_rev2) {
@@ -859,17 +925,19 @@ function DowngradeROM() {
 #==============================================================================================================================================================================================
 function CompareHashSums() {
     
-    if ($PatchFile -ne $null -and $GetCommand -ne "Patch BPS") {
+    if ($GetCommand -eq "Inject" -or $GetCommand -eq "Patch VC") { return $True }
+
+    if (($PatchFile -ne $Null -or $IsRedux) -and $GetCommand -ne "Patch BPS") {
 
         $ContinuePatching = $True
         $HashSum = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
         
         if ($CheckHashSum -eq "Dawn & Dusk") {
-            if ($HashSum -eq $HashSum_oot_rev0) { $PatchFile = $Files.bpspatch_oot_dawn_rev0 }
-            elseif ($HashSum -eq $HashSum_oot_rev1) { $PatchFile = $Files.bpspatch_oot_dawn_rev1 }
-            elseif ($HashSum -eq $HashSum_oot_rev2) { $PatchFile = $Files.bpspatch_oot_dawn_rev2 }
+            if ($HashSum -eq $HashSum_oot_rev0)     { $global:PatchFile = $Files.bpspatch_oot_dawn_rev0 }
+            elseif ($HashSum -eq $HashSum_oot_rev1) { $global:PatchFile = $Files.bpspatch_oot_dawn_rev1 }
+            elseif ($HashSum -eq $HashSum_oot_rev2) { $global:PatchFile = $Files.bpspatch_oot_dawn_rev2 }
             else { $ContinuePatching = $False }
-        }    
+        }
         elseif ($HashSum -ne $CheckHashSum) { $ContinuePatching = $False }
 
         if (!$ContinuePatching) {
@@ -888,7 +956,7 @@ function CompareHashSums() {
 #==============================================================================================================================================================================================
 function DecompressROM() {
 
-    if (!$IsCompress -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
+    if (!$IsCompress -or $GetCommand -eq "Inject" -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
     
     & $Files.TabExt $ROMFile | Out-Host
     & $Files.ndec $ROMFile $DecompressedROMFile | Out-Host
@@ -901,6 +969,8 @@ function DecompressROM() {
 
 #==============================================================================================================================================================================================
 function PatchROM([string]$Hash) {
+
+    if ($GetCommand -eq "Inject" -or $GetCommand -eq "Patch VC") { return $True }
     
     # Set the status label.
     UpdateStatusLabelDuringPatching -Text ("BPS Patching " + $GameType + " ROM...")
@@ -913,15 +983,17 @@ function PatchROM([string]$Hash) {
         if ($IsWiiVC -and $IsCompress)         { & $Files.flips $PatchFile $DecompressedROMFile | Out-Host }
         elseif ($IsWiiVC -and !$IsCompress)    { & $Files.flips $PatchFile $PatchedROMFile | Out-Host }
         elseif (!$IsWiiVC -and $IsCompress)    { & $Files.flips $PatchFile $DecompressedROMFile | Out-Host }
-        elseif (!$IsWiiVC -and !$IsCompress)   { & $Files.flips --apply $PatchFile $ROMFile $PatchedROMFile | Out-Host }
+        elseif (!$IsWiiVC -and !$IsCompress)   { 
+        & $Files.flips --apply $PatchFile $ROMFile $PatchedROMFile | Out-Host 
+        }
     }
 
     if ($IsWiiVC -and $GetCommand -eq "BPS Patch") {
         $HashSum2 = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
         if ($HashSum1 -eq $HashSum2) {
             UpdateStatusLabelDuringPatching -Text 'Failed! BPS or IPS Patch does not match. ROM has left unchanged.'
-            if ($GameType -eq "Ocarina of Time" -and !$PatchVCDowngrade.Checked) { UpdateStatusLabelDuringPatching -Text "Failed! BPS or IPS Patch does not match. ROM has left unchanged. Enable Downgrade Ocarina of Time?" }
-            elseif ($GameType -eq "Ocarina of Time" -and $PatchVCDowngrade.Checked) { UpdateStatusLabelDuringPatching -Text "Failed! BPS or IPS Patch does not match. ROM has left unchanged. Disable Downgrade Ocarina of Time?" }
+            if ($GameType -eq "Ocarina of Time" -and !$IsDowngrade) { UpdateStatusLabelDuringPatching -Text "Failed! BPS or IPS Patch does not match. ROM has left unchanged. Enable Downgrade Ocarina of Time?" }
+            elseif ($GameType -eq "Ocarina of Time" -and $IsDowngrade) { UpdateStatusLabelDuringPatching -Text "Failed! BPS or IPS Patch does not match. ROM has left unchanged. Disable Downgrade Ocarina of Time?" }
             return $False
         }
     }
@@ -935,7 +1007,7 @@ function PatchROM([string]$Hash) {
 #==============================================================================================================================================================================================
 function CompressROM() {
     
-    if (!$IsCompress -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
+    if (!$IsCompress -or $GetCommand -eq "Inject" -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
 
     & $Files.Compress $DecompressedROMFile $PatchedROMFile
     Remove-Item $DecompressedROMFile
@@ -961,15 +1033,10 @@ function CompressROMC() {
 function PatchRedux() {
     
     # SETUP #
-
     if (!$IsRedux -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
-
     UpdateStatusLabelDuringPatching -Text ("Patching " + $GameType + " REDUX...")
 
-
-
     # NEW DMATABLE #
-
     $offsets = ""
     if ($GameType -eq "Ocarina of Time") {
         $offsets = "0 1 2 3 4 5 6 7 8 9 15 16 17 18 19 20 21 22 23 24 25 26 942 944 946 948 950 952 954 956 958 960 962 964 966 968 970 972 974 976 978 980 982 984 986 988 990 992 994 "
@@ -979,98 +1046,88 @@ function PatchRedux() {
         $offsets = "0 1 2 3 4 5 6 7 -8 -9 15 16 17 18 19 20 -21 22 25 26 27 28 29 30 -652 1127 -1539 -1540 -1541 -1542 -1543 1544 "
         $offsets += "1545 1546 1547 1548 1549 1550 -1551 1552 1553 1554 1555 1556 1557 1558 1559 1560 1561 1562 1563 1564 1565 1566 1567" 
     }
-        
+    
     if (Test-Path dmaTable.dat -PathType leaf) { Remove-Item dmaTable.dat }
     Add-Content dmaTable.dat $offsets
 
-
-
     # BPS PATCHING #
-
     if ($GameType -eq "Ocarina of Time") {
-
-        if (CheckCheckBox -CheckBox $MMModelsOoT) {
-            & $Files.flips --ignore-checksum $Files.bpspatch_oot_models_mm $DecompressedROMFile | Out-Host
-        }
-        
+        if (CheckCheckBox -CheckBox $MMModelsOoT)                { & $Files.flips --ignore-checksum $Files.bpspatch_oot_models_mm $DecompressedROMFile | Out-Host }
+        if (CheckCheckBox -CheckBox $WidescreenBackgroundsOoT)   { & $Files.flips --ignore-checksum $Files.bpspatch_oot_widescreen $DecompressedROMFile | Out-Host }
     }
 
-
-
     # BYTE PATCHING #
-
     $ByteArray = [IO.File]::ReadAllBytes($DecompressedROMFile)
+    if ($GameType -eq "Ocarina of Time")     { $ByteArray = PatchReduxOoT -ByteArray $ByteArray }
+    elseif ($GameType -eq "Majora's Mask")   { $ByteArray = PatchReduxMM -ByteArray $ByteArray }
+    [io.file]::WriteAllBytes($DecompressedROMFile, $ByteArray)
 
-    if ($GameType -eq "Ocarina of Time") {
-        
-        # HERO MODE #
+}
 
-        if (CheckCheckBox -CheckBox $OHKOModeOoT) {
-            $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
-            $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
-            $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+
+#==============================================================================================================================================================================================
+function PatchReduxOoT($ByteArray) {
+    
+    # HERO MODE #
+
+    if (CheckCheckBox -CheckBox $OHKOModeOoT) {
+        $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
+        $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
+        $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+        $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
+        $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
+        $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
+    }
+    elseif (!(CheckCheckBox -CheckBox $1xDamageOoT) -and !(CheckCheckBox -CheckBox $NormalRecoveryOoT)) {
+        $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
+        if (CheckCheckBox -CheckBox $NormalRecoveryOoT) {                
+            $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+            if (CheckCheckBox -CheckBox $2xDamageOoT )      { $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40") }
+            elseif (CheckCheckBox -CheckBox $4xDamageOoT)   { $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80") }
+            elseif (CheckCheckBox -CheckBox $8xDamageOoT)   { $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0") }
             $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
             $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
             $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
         }
-        elseif (!(CheckCheckBox -CheckBox $1xDamageOoT) -and !(CheckCheckBox -CheckBox $NormalRecoveryOoT)) {
-            $ByteArray[(GetDecimal -Hex "0xAE8073")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0xAE8083")] = (GetDecimal -Hex "0x04")
-            if (CheckCheckBox -CheckBox $NormalRecoveryOoT) {                
+        elseif (CheckCheckBox -CheckBox $HalfRecoveryOoT) {               
+            if (CheckCheckBox -CheckBox $1xDamageOoT) {
                 $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                if (CheckCheckBox -CheckBox $2xDamageOoT ) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x00")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x00")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x00")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
             }
-            elseif (CheckCheckBox -CheckBox $HalfRecoveryOoT) {               
-                if (CheckCheckBox -CheckBox $1xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                elseif (CheckCheckBox -CheckBox $2xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-                }
-
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
+            elseif (CheckCheckBox -CheckBox $2xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
             }
-            elseif (CheckCheckBox -CheckBox $QuarterRecoveryOoT) {                
-                if (CheckCheckBox -CheckBox $1xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $2xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
+            elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+            }
+            elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+            }
+            $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
+            $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
+            $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
+        }
+        elseif (CheckCheckBox -CheckBox $QuarterRecoveryOoT) {                
+            if (CheckCheckBox -CheckBox $1xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
+            }
+            elseif (CheckCheckBox -CheckBox $2xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x80")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+            }
+            elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+            }
+            elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
                 }
                 $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
                 $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x80")
@@ -1078,497 +1135,480 @@ function PatchRedux() {
 
             }
             elseif (CheckCheckBox -CheckBox $NoRecoveryOoT) {                
-                if (CheckCheckBox -CheckBox $1xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
-                }
-                elseif (CheckCheckBox -CheckBox $2xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
-                    $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
-                    $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
-                }
-                $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
-                $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x81")
-                $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
+            if (CheckCheckBox -CheckBox $1xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x40")
             }
+            elseif (CheckCheckBox -CheckBox $2xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x80")
+            }
+            elseif (CheckCheckBox -CheckBox $4xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x81")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0xC0")
+            }
+            elseif (CheckCheckBox -CheckBox $8xDamageOoT) {
+                $ByteArray[(GetDecimal -Hex "0xAE8096")] = (GetDecimal -Hex "0x82")
+                $ByteArray[(GetDecimal -Hex "0xAE8097")] = (GetDecimal -Hex "0x00")
+            }
+            $ByteArray[(GetDecimal -Hex "0xAE8099")] = (GetDecimal -Hex "0x10")
+            $ByteArray[(GetDecimal -Hex "0xAE809A")] = (GetDecimal -Hex "0x81")
+            $ByteArray[(GetDecimal -Hex "0xAE809B")] = (GetDecimal -Hex "0x43")
         }
-
-
-
-        # TEXT DIALOGUE SPEED #
-
-        if ((CheckCheckBox -CheckBox $1xTextOoT) -and (CheckCheckBox -CheckBox $IncludeReduxOoT)) {
-            $ByteArray[(GetDecimal -Hex "0xB5006F")] = 1
-        }
-        elseif ((CheckCheckBox -CheckBox $2xTextOoT) -and !(CheckCheckBox -CheckBox $IncludeReduxOoT)) {
-            $ByteArray[(GetDecimal -Hex "0xB5006F")] = 2
-        }
-        elseif (CheckCheckBox -CheckBox $3xTextOoT) {
-            $ByteArray[(GetDecimal -Hex "0x93B6E7")] = (GetDecimal -Hex "0x05")
-            $ByteArray[(GetDecimal -Hex "0x93B6E8")] = (GetDecimal -Hex "0x40")
-            $ByteArray[(GetDecimal -Hex "0x93B6E9")] = (GetDecimal -Hex "0x2E")
-            $ByteArray[(GetDecimal -Hex "0x93B6EA")] = (GetDecimal -Hex "0x05")
-            $ByteArray[(GetDecimal -Hex "0x93B6EB")] = (GetDecimal -Hex "0x46")
-            $ByteArray[(GetDecimal -Hex "0x93B6EC")] = (GetDecimal -Hex "0x01")
-            $ByteArray[(GetDecimal -Hex "0x93B6ED")] = (GetDecimal -Hex "0x05")
-            $ByteArray[(GetDecimal -Hex "0x93B6EE")] = (GetDecimal -Hex "0x40")
-            $ByteArray[(GetDecimal -Hex "0x93B6EF")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B6F1")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B71E")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B71D")] = (GetDecimal -Hex "0x2E")
-
-            $ByteArray[(GetDecimal -Hex "0x93B722")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B74C")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B74D")] = (GetDecimal -Hex "0x21")
-            $ByteArray[(GetDecimal -Hex "0x93B74E")] = (GetDecimal -Hex "0x05")
-            $ByteArray[(GetDecimal -Hex "0x93B74F")] = (GetDecimal -Hex "0x42")
-
-            $ByteArray[(GetDecimal -Hex "0x93B752")] = (GetDecimal -Hex "0x01")
-            $ByteArray[(GetDecimal -Hex "0x93B753")] = (GetDecimal -Hex "0x05")
-            $ByteArray[(GetDecimal -Hex "0x93B754")] = (GetDecimal -Hex "0x40")
-
-            $ByteArray[(GetDecimal -Hex "0x93B776")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B777")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B77A")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7A1")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B7A2")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7A5")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7A8")] = (GetDecimal -Hex "0x1A")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7C9")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B7CA")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7CD")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7F2")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B7F3")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B7F6")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B81C")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B81D")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B820")] = (GetDecimal -Hex "0x1")
-
-            $ByteArray[(GetDecimal -Hex "0x93B849")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B84A")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B84D")] = (GetDecimal -Hex "0x1")
-
-            $ByteArray[(GetDecimal -Hex "0x93B86D")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B86E")] = (GetDecimal -Hex "0x2E")
-
-            $ByteArray[(GetDecimal -Hex "0x93B871")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B88F")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B890")] = (GetDecimal -Hex "0x2E")
-
-            $ByteArray[(GetDecimal -Hex "0x93B893")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B8BE")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B8BF")] = (GetDecimal -Hex "0x2E")
-
-            $ByteArray[(GetDecimal -Hex "0x93B8C2")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B8EF")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B8F0")] = (GetDecimal -Hex "0x2E")
-
-            $ByteArray[(GetDecimal -Hex "0x93B8F3")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B91A")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B91B")] = (GetDecimal -Hex "0x21")
-
-            $ByteArray[(GetDecimal -Hex "0x93B91E")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B94E")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0x93B94F")] = (GetDecimal -Hex "0x2E")
-
-            $ByteArray[(GetDecimal -Hex "0x93B952")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0x93B728")] = (GetDecimal -Hex "0x10")
-            $ByteArray[(GetDecimal -Hex "0x93B72A")] = (GetDecimal -Hex "0x01")
-
-            $ByteArray[(GetDecimal -Hex "0xB5006F")] = (GetDecimal -Hex "0x03")
-        }
-
-
-
-        # GRAPHICS #
-
-        if (CheckCheckBox -CheckBox $WideScreenOoT) {
-            $ByteArray[(GetDecimal -Hex "0xB08038")] = (GetDecimal -Hex "0x3C")
-            $ByteArray[(GetDecimal -Hex "0xB08039")] = (GetDecimal -Hex "0x07")
-            $ByteArray[(GetDecimal -Hex "0xB0803A")] = (GetDecimal -Hex "0x3F")
-            $ByteArray[(GetDecimal -Hex "0xB0803B")] = (GetDecimal -Hex "0xE3")
-        }
-
-        if (CheckCheckBox -CheckBox $ExtendedDrawOoT) {
-            $ByteArray[(GetDecimal -Hex "0xA9A970")] = 0
-            $ByteArray[(GetDecimal -Hex "0xA9A971")] = 1
-        }
-
-        if (CheckCheckBox -CheckBox $BlackBarsOoT) {
-            $ByteArray[(GetDecimal -Hex "0xB0F5A4")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5A5")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5A6")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5A7")] = 0
-
-            $ByteArray[(GetDecimal -Hex "0xB0F5D4")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5D5")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5D6")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5D7")] = 0
-
-            $ByteArray[(GetDecimal -Hex "0xB0F5E4")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5E5")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5E6")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F5E7")] = 0
-
-            $ByteArray[(GetDecimal -Hex "0xB0F680")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F681")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F682")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F683")] = 0
-
-            $ByteArray[(GetDecimal -Hex "0xB0F688")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F689")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F68A")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB0F68B")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $ForceHiresModelOoT) {
-            $ByteArray[(GetDecimal -Hex "0xBE608B")] = 0
-        }
-
-
-
-        # EQUIPMENT #
-
-        if (CheckCheckBox -CheckBox $ReducedItemCapacityOoT) {
-            $ByteArray[(GetDecimal -Hex "0xB6EC2F")] = 20
-            $ByteArray[(GetDecimal -Hex "0xB6EC31")] = 25
-            $ByteArray[(GetDecimal -Hex "0xB6EC33")] = 30
-            $ByteArray[(GetDecimal -Hex "0xB6EC37")] = 10
-            $ByteArray[(GetDecimal -Hex "0xB6EC39")] = 15
-            $ByteArray[(GetDecimal -Hex "0xB6EC3B")] = 20
-            $ByteArray[(GetDecimal -Hex "0xB6EC57")] = 20
-            $ByteArray[(GetDecimal -Hex "0xB6EC59")] = 25
-            $ByteArray[(GetDecimal -Hex "0xB6EC5B")] = 30
-            $ByteArray[(GetDecimal -Hex "0xB6EC5F")] = 5
-            $ByteArray[(GetDecimal -Hex "0xB6EC61")] = 10
-            $ByteArray[(GetDecimal -Hex "0xB6EC63")] = 15
-            $ByteArray[(GetDecimal -Hex "0xB6EC67")] = 10
-            $ByteArray[(GetDecimal -Hex "0xB6EC69")] = 15
-            $ByteArray[(GetDecimal -Hex "0xB6EC6A")] = 20
-        }
-        elseif (CheckCheckBox -CheckBox $IncreasedIemCapacityOOT) {
-            $ByteArray[(GetDecimal -Hex "0xB6EC2F")] = 40
-            $ByteArray[(GetDecimal -Hex "0xB6EC31")] = 70
-            $ByteArray[(GetDecimal -Hex "0xB6EC33")] = 99
-            $ByteArray[(GetDecimal -Hex "0xB6EC37")] = 30
-            $ByteArray[(GetDecimal -Hex "0xB6EC39")] = 55
-            $ByteArray[(GetDecimal -Hex "0xB6EC3B")] = 80
-            $ByteArray[(GetDecimal -Hex "0xB6EC57")] = 40
-            $ByteArray[(GetDecimal -Hex "0xB6EC59")] = 70
-            $ByteArray[(GetDecimal -Hex "0xB6EC5B")] = 99
-            $ByteArray[(GetDecimal -Hex "0xB6EC5F")] = 15
-            $ByteArray[(GetDecimal -Hex "0xB6EC61")] = 30
-            $ByteArray[(GetDecimal -Hex "0xB6EC63")] = 45
-            $ByteArray[(GetDecimal -Hex "0xB6EC67")] = 30
-            $ByteArray[(GetDecimal -Hex "0xB6EC69")] = 55
-            $ByteArray[(GetDecimal -Hex "0xB6EC6A")] = 80
-        }
-
-        if (CheckCheckBox -CheckBox $UnlockSwordOoT) {
-            $ByteArray[(GetDecimal -Hex "0xBC77AD")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77F7")] = 9
-        }
-
-        if (CheckCheckBox -CheckBox $UnlockTunicsOoT) {
-            $ByteArray[(GetDecimal -Hex "0xBC77B6")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77B7")] = 9
-
-            $ByteArray[(GetDecimal -Hex "0xBC77FE")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77FF")] = 9
-        }
-
-        if (CheckCheckBox -CheckBox $UnlockBootsOoT) {
-            $ByteArray[(GetDecimal -Hex "0xBC77BA")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC77BB")] = 9
-
-            $ByteArray[(GetDecimal -Hex "0xBC7801")] = 9
-            $ByteArray[(GetDecimal -Hex "0xBC7802")] = 9
-        }
-
-
-
-        # OTHER #
-
-        if (CheckCheckBox -CheckBox $MedallionsOoT) {
-            $ByteArray[(GetDecimal -Hex "0xE2B454")] = (GetDecimal -Hex "0x80")
-            $ByteArray[(GetDecimal -Hex "0xE2B455")] = (GetDecimal -Hex "0xEA")
-            $ByteArray[(GetDecimal -Hex "0xE2B456")] = 0
-            $ByteArray[(GetDecimal -Hex "0xE2B457")] = (GetDecimal -Hex "0xA7")
-            $ByteArray[(GetDecimal -Hex "0xE2B458")] = (GetDecimal -Hex "0x24")
-            $ByteArray[(GetDecimal -Hex "0xE2B459")] = 1
-            $ByteArray[(GetDecimal -Hex "0xE2B45A")] = 0
-            $ByteArray[(GetDecimal -Hex "0xE2B45B")] = (GetDecimal -Hex "0x3F")
-            $ByteArray[(GetDecimal -Hex "0xE2B45C")] = (GetDecimal -Hex "0x31")
-            $ByteArray[(GetDecimal -Hex "0xE2B45D")] = (GetDecimal -Hex "0x4A")
-            $ByteArray[(GetDecimal -Hex "0xE2B45E")] = 0
-            $ByteArray[(GetDecimal -Hex "0xE2B45F")] = (GetDecimal -Hex "0x3F")
-            $ByteArray[(GetDecimal -Hex "0xE2B460")] = 0
-            $ByteArray[(GetDecimal -Hex "0xE2B461")] = 0
-            $ByteArray[(GetDecimal -Hex "0xE2B462")] = 0
-            $ByteArray[(GetDecimal -Hex "0xE2B463")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $ReturnChildOoT) {
-            $ByteArray[(GetDecimal -Hex "0xCB6844")] = (GetDecimal -Hex "0x35")
-            $ByteArray[(GetDecimal -Hex "0x253C0E2")] = 3
-        }
-
-        if (CheckCheckBox -CheckBox $DisableLowHPSoundOoT) {
-            $ByteArray[(GetDecimal -Hex "0xADBA1A")] = 0
-            $ByteArray[(GetDecimal -Hex "0xADBA1B")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $DisableNaviooT) {
-            $ByteArray[(GetDecimal -Hex "0xDF8B84")] = 0
-            $ByteArray[(GetDecimal -Hex "0xDF8B85")] = 0
-            $ByteArray[(GetDecimal -Hex "0xDF8B86")] = 0
-            $ByteArray[(GetDecimal -Hex "0xDF8B87")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $HideDPadOOT) {
-            $ByteArray[(GetDecimal -Hex "0x348086E")] = (GetDecimal -Hex "0x00")
-        }
-
     }
 
-    elseif ($GameType -eq "Majora's Mask") {
-        
-        # HERO MODE #
 
-        if (CheckCheckBox -CheckBox $OHKOModeMM) {
-            $ByteArray[(GetDecimal -Hex "0xBABE7F")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0xBABE8F")] = (GetDecimal -Hex "0x04")
-            $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x2A")
-            $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
+
+    # TEXT DIALOGUE SPEED #
+
+    if (CheckCheckBox -CheckBox $1xTextOoT)       { $ByteArray[(GetDecimal -Hex "0xB5006F")] = 1 }
+    elseif (CheckCheckBox -CheckBox $2xTextOoT)   { $ByteArray[(GetDecimal -Hex "0xB5006F")] = 2 }
+    elseif (CheckCheckBox -CheckBox $3xTextOoT) {
+        $ByteArray[(GetDecimal -Hex "0x93B6E7")] = (GetDecimal -Hex "0x05")
+        $ByteArray[(GetDecimal -Hex "0x93B6E8")] = (GetDecimal -Hex "0x40")
+        $ByteArray[(GetDecimal -Hex "0x93B6E9")] = (GetDecimal -Hex "0x2E")
+        $ByteArray[(GetDecimal -Hex "0x93B6EA")] = (GetDecimal -Hex "0x05")
+        $ByteArray[(GetDecimal -Hex "0x93B6EB")] = (GetDecimal -Hex "0x46")
+        $ByteArray[(GetDecimal -Hex "0x93B6EC")] = (GetDecimal -Hex "0x01")
+        $ByteArray[(GetDecimal -Hex "0x93B6ED")] = (GetDecimal -Hex "0x05")
+        $ByteArray[(GetDecimal -Hex "0x93B6EE")] = (GetDecimal -Hex "0x40")
+        $ByteArray[(GetDecimal -Hex "0x93B6EF")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B6F1")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B71E")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B71D")] = (GetDecimal -Hex "0x2E")
+
+        $ByteArray[(GetDecimal -Hex "0x93B722")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B74C")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B74D")] = (GetDecimal -Hex "0x21")
+        $ByteArray[(GetDecimal -Hex "0x93B74E")] = (GetDecimal -Hex "0x05")
+        $ByteArray[(GetDecimal -Hex "0x93B74F")] = (GetDecimal -Hex "0x42")
+
+        $ByteArray[(GetDecimal -Hex "0x93B752")] = (GetDecimal -Hex "0x01")
+        $ByteArray[(GetDecimal -Hex "0x93B753")] = (GetDecimal -Hex "0x05")
+        $ByteArray[(GetDecimal -Hex "0x93B754")] = (GetDecimal -Hex "0x40")
+
+        $ByteArray[(GetDecimal -Hex "0x93B776")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B777")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B77A")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7A1")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B7A2")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7A5")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7A8")] = (GetDecimal -Hex "0x1A")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7C9")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B7CA")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7CD")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7F2")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B7F3")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B7F6")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B81C")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B81D")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B820")] = (GetDecimal -Hex "0x1")
+
+        $ByteArray[(GetDecimal -Hex "0x93B849")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B84A")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B84D")] = (GetDecimal -Hex "0x1")
+
+        $ByteArray[(GetDecimal -Hex "0x93B86D")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B86E")] = (GetDecimal -Hex "0x2E")
+
+        $ByteArray[(GetDecimal -Hex "0x93B871")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B88F")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B890")] = (GetDecimal -Hex "0x2E")
+
+        $ByteArray[(GetDecimal -Hex "0x93B893")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B8BE")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B8BF")] = (GetDecimal -Hex "0x2E")
+
+        $ByteArray[(GetDecimal -Hex "0x93B8C2")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B8EF")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B8F0")] = (GetDecimal -Hex "0x2E")
+
+        $ByteArray[(GetDecimal -Hex "0x93B8F3")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B91A")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B91B")] = (GetDecimal -Hex "0x21")
+
+        $ByteArray[(GetDecimal -Hex "0x93B91E")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B94E")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0x93B94F")] = (GetDecimal -Hex "0x2E")
+
+        $ByteArray[(GetDecimal -Hex "0x93B952")] = (GetDecimal -Hex "0x01")
+
+        $ByteArray[(GetDecimal -Hex "0x93B728")] = (GetDecimal -Hex "0x10")
+        $ByteArray[(GetDecimal -Hex "0x93B72A")] = (GetDecimal -Hex "0x01")
+
+            $ByteArray[(GetDecimal -Hex "0xB5006F")] = (GetDecimal -Hex "0x03")
+    }
+
+
+
+    # GRAPHICS #
+
+    if (CheckCheckBox -CheckBox $WideScreenOoT) {
+        $ByteArray[(GetDecimal -Hex "0xB08038")] = (GetDecimal -Hex "0x3C")
+        $ByteArray[(GetDecimal -Hex "0xB08039")] = (GetDecimal -Hex "0x07")
+        $ByteArray[(GetDecimal -Hex "0xB0803A")] = (GetDecimal -Hex "0x3F")
+        $ByteArray[(GetDecimal -Hex "0xB0803B")] = (GetDecimal -Hex "0xE3")
+    }
+
+    if (CheckCheckBox -CheckBox $ExtendedDrawOoT) {
+        $ByteArray[(GetDecimal -Hex "0xA9A970")] = 0
+        $ByteArray[(GetDecimal -Hex "0xA9A971")] = 1
+    }
+
+    if (CheckCheckBox -CheckBox $BlackBarsOoT) {
+        $ByteArray[(GetDecimal -Hex "0xB0F5A4")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5A5")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5A6")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5A7")] = 0
+
+        $ByteArray[(GetDecimal -Hex "0xB0F5D4")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5D5")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5D6")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5D7")] = 0
+
+        $ByteArray[(GetDecimal -Hex "0xB0F5E4")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5E5")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5E6")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F5E7")] = 0
+
+        $ByteArray[(GetDecimal -Hex "0xB0F680")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F681")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F682")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F683")] = 0
+
+        $ByteArray[(GetDecimal -Hex "0xB0F688")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F689")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F68A")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB0F68B")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $ForceHiresModelOoT)   { $ByteArray[(GetDecimal -Hex "0xBE608B")] = 0 }
+
+
+
+    # EQUIPMENT #
+
+    if (CheckCheckBox -CheckBox $ReducedItemCapacityOoT) {
+        $ByteArray[(GetDecimal -Hex "0xB6EC2F")] = 20
+        $ByteArray[(GetDecimal -Hex "0xB6EC31")] = 25
+        $ByteArray[(GetDecimal -Hex "0xB6EC33")] = 30
+        $ByteArray[(GetDecimal -Hex "0xB6EC37")] = 10
+        $ByteArray[(GetDecimal -Hex "0xB6EC39")] = 15
+        $ByteArray[(GetDecimal -Hex "0xB6EC3B")] = 20
+        $ByteArray[(GetDecimal -Hex "0xB6EC57")] = 20
+        $ByteArray[(GetDecimal -Hex "0xB6EC59")] = 25
+        $ByteArray[(GetDecimal -Hex "0xB6EC5B")] = 30
+        $ByteArray[(GetDecimal -Hex "0xB6EC5F")] = 5
+        $ByteArray[(GetDecimal -Hex "0xB6EC61")] = 10
+        $ByteArray[(GetDecimal -Hex "0xB6EC63")] = 15
+        $ByteArray[(GetDecimal -Hex "0xB6EC67")] = 10
+        $ByteArray[(GetDecimal -Hex "0xB6EC69")] = 15
+        $ByteArray[(GetDecimal -Hex "0xB6EC6A")] = 20
+    }
+    elseif (CheckCheckBox -CheckBox $IncreasedIemCapacityOOT) {
+        $ByteArray[(GetDecimal -Hex "0xB6EC2F")] = 40
+        $ByteArray[(GetDecimal -Hex "0xB6EC31")] = 70
+        $ByteArray[(GetDecimal -Hex "0xB6EC33")] = 99
+        $ByteArray[(GetDecimal -Hex "0xB6EC37")] = 30
+        $ByteArray[(GetDecimal -Hex "0xB6EC39")] = 55
+        $ByteArray[(GetDecimal -Hex "0xB6EC3B")] = 80
+        $ByteArray[(GetDecimal -Hex "0xB6EC57")] = 40
+        $ByteArray[(GetDecimal -Hex "0xB6EC59")] = 70
+        $ByteArray[(GetDecimal -Hex "0xB6EC5B")] = 99
+        $ByteArray[(GetDecimal -Hex "0xB6EC5F")] = 15
+        $ByteArray[(GetDecimal -Hex "0xB6EC61")] = 30
+        $ByteArray[(GetDecimal -Hex "0xB6EC63")] = 45
+        $ByteArray[(GetDecimal -Hex "0xB6EC67")] = 30
+        $ByteArray[(GetDecimal -Hex "0xB6EC69")] = 55
+        $ByteArray[(GetDecimal -Hex "0xB6EC6A")] = 80
+    }
+
+    if (CheckCheckBox -CheckBox $UnlockSwordOoT) {
+        $ByteArray[(GetDecimal -Hex "0xBC77AD")] = 9
+        $ByteArray[(GetDecimal -Hex "0xBC77F7")] = 9
+    }
+
+    if (CheckCheckBox -CheckBox $UnlockTunicsOoT) {
+        $ByteArray[(GetDecimal -Hex "0xBC77B6")] = 9 # Goron Tunic
+        $ByteArray[(GetDecimal -Hex "0xBC77B7")] = 9
+        $ByteArray[(GetDecimal -Hex "0xBC77FE")] = 9 # Zora Tunic
+        $ByteArray[(GetDecimal -Hex "0xBC77FF")] = 9
+    }
+
+    if (CheckCheckBox -CheckBox $UnlockBootsOoT) {
+        $ByteArray[(GetDecimal -Hex "0xBC77BA")] = 9 # Iron Boots
+        $ByteArray[(GetDecimal -Hex "0xBC77BB")] = 9
+        $ByteArray[(GetDecimal -Hex "0xBC7801")] = 9 # Hover Boots
+        $ByteArray[(GetDecimal -Hex "0xBC7802")] = 9
+    }
+
+
+
+    # OTHER #
+
+    if (CheckCheckBox -CheckBox $MedallionsOoT) {
+        $ByteArray[(GetDecimal -Hex "0xE2B454")] = (GetDecimal -Hex "0x80")
+        $ByteArray[(GetDecimal -Hex "0xE2B455")] = (GetDecimal -Hex "0xEA")
+        $ByteArray[(GetDecimal -Hex "0xE2B456")] = 0
+        $ByteArray[(GetDecimal -Hex "0xE2B457")] = (GetDecimal -Hex "0xA7")
+        $ByteArray[(GetDecimal -Hex "0xE2B458")] = (GetDecimal -Hex "0x24")
+        $ByteArray[(GetDecimal -Hex "0xE2B459")] = 1
+        $ByteArray[(GetDecimal -Hex "0xE2B45A")] = 0
+        $ByteArray[(GetDecimal -Hex "0xE2B45B")] = (GetDecimal -Hex "0x3F")
+        $ByteArray[(GetDecimal -Hex "0xE2B45C")] = (GetDecimal -Hex "0x31")
+        $ByteArray[(GetDecimal -Hex "0xE2B45D")] = (GetDecimal -Hex "0x4A")
+        $ByteArray[(GetDecimal -Hex "0xE2B45E")] = 0
+        $ByteArray[(GetDecimal -Hex "0xE2B45F")] = (GetDecimal -Hex "0x3F")
+        $ByteArray[(GetDecimal -Hex "0xE2B460")] = 0
+        $ByteArray[(GetDecimal -Hex "0xE2B461")] = 0
+        $ByteArray[(GetDecimal -Hex "0xE2B462")] = 0
+        $ByteArray[(GetDecimal -Hex "0xE2B463")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $ReturnChildOoT) {
+        $ByteArray[(GetDecimal -Hex "0xCB6844")] = (GetDecimal -Hex "0x35")
+        $ByteArray[(GetDecimal -Hex "0x253C0E2")] = 3
+    }
+
+    if (CheckCheckBox -CheckBox $DisableLowHPSoundOoT) {
+        $ByteArray[(GetDecimal -Hex "0xADBA1A")] = 0
+        $ByteArray[(GetDecimal -Hex "0xADBA1B")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $DisableNaviooT) {
+        $ByteArray[(GetDecimal -Hex "0xDF8B84")] = 0
+        $ByteArray[(GetDecimal -Hex "0xDF8B85")] = 0
+        $ByteArray[(GetDecimal -Hex "0xDF8B86")] = 0
+        $ByteArray[(GetDecimal -Hex "0xDF8B87")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $HideDPadOOT)   { $ByteArray[(GetDecimal -Hex "0x348086E")] = (GetDecimal -Hex "0x00") }
+
+
+
+    # Finished
+    return $ByteArray
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function PatchReduxMM($ByteArray) {
+    
+    # HERO MODE #
+
+    if (CheckCheckBox -CheckBox $OHKOModeMM) {
+        $ByteArray[(GetDecimal -Hex "0xBABE7F")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0xBABE8F")] = (GetDecimal -Hex "0x04")
+        $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x2A")
+        $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
+        $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x00")
+        $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x00")
+        $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x00")
+    }
+    elseif (!(CheckCheckBox -CheckBox $1xDamageMM) -and !(CheckCheckBox -CheckBox $NormalRecoveryMM)) {
+        $ByteArray[(GetDecimal -Hex "0xBABE7F")] = (GetDecimal -Hex "0x09")
+        $ByteArray[(GetDecimal -Hex "0xBABE8F")] = (GetDecimal -Hex "0x04")
+        if (CheckCheckBox -CheckBox $NormalRecoveryMM) {
+            $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
+            if (CheckCheckBox -CheckBox $2xDamageMM)       { $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40") }
+            elseif (CheckCheckBox -CheckBox $4xDamageMM)   { $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x80") }
+            elseif (CheckCheckBox -CheckBox $8xDamageMM)   { $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0") }
             $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x00")
             $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x00")
             $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x00")
         }
-        elseif (!(CheckCheckBox -CheckBox $1xDamageMM) -and !(CheckCheckBox -CheckBox $NormalRecoveryMM)) {
-            $ByteArray[(GetDecimal -Hex "0xBABE7F")] = (GetDecimal -Hex "0x09")
-            $ByteArray[(GetDecimal -Hex "0xBABE8F")] = (GetDecimal -Hex "0x04")
-            if (CheckCheckBox -CheckBox $NormalRecoveryMM) {
+        elseif (CheckCheckBox -CheckBox $HalfRecoveryMM) {
+            if (CheckCheckBox -CheckBox $1xDamageMM) {
                 $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
-                if (CheckCheckBox -CheckBox $2xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
-                }
-                $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x00")
-                $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x00")
-                $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x00")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
             }
-            elseif (CheckCheckBox -CheckBox $HalfRecoveryMM) {
-                if (CheckCheckBox -CheckBox $1xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
-                }
-                elseif (CheckCheckBox -CheckBox $2xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
-                }
-                $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x05")
-                $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x28")
-                $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x43")
+            elseif (CheckCheckBox -CheckBox $2xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x80")
             }
-            elseif (CheckCheckBox -CheckBox $QuarterRecoveryMM) {
-                if (CheckCheckBox -CheckBox $1xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $2xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
-                }
-                $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x05")
-                $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x28")
-                $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x83")
+            elseif (CheckCheckBox -CheckBox $4xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
             }
-            elseif (CheckCheckBox -CheckBox $NoRecoveryMM) {
-                if (CheckCheckBox -CheckBox $1xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
-                }
-                elseif (CheckCheckBox -CheckBox $2xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x80")
-                }
-                elseif (CheckCheckBox -CheckBox $4xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
-                }
-                elseif (CheckCheckBox -CheckBox $8xDamageMM) {
-                    $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x2A")
-                    $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
-                }
-                $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x05")
-                $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x29")
-                $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x43")
+            elseif (CheckCheckBox -CheckBox $8xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
             }
+            $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x05")
+            $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x28")
+            $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x43")
         }
-
-
-
-        # D-PAD #
-
-        if (CheckCheckBox -CheckBox $LeftDPadMM) {
-            $ByteArray[(GetDecimal -Hex "0x3806365")] = 1
+        elseif (CheckCheckBox -CheckBox $QuarterRecoveryMM) {
+            if (CheckCheckBox -CheckBox $1xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x80")
+            }
+            elseif (CheckCheckBox -CheckBox $2xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x28")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
+            }
+            elseif (CheckCheckBox -CheckBox $4xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
+            }
+            elseif (CheckCheckBox -CheckBox $8xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
+            }
+            $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x05")
+            $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x28")
+            $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x83")
         }
-        elseif (CheckCheckBox -CheckBox $RightDPadMM) {
-            $ByteArray[(GetDecimal -Hex "0x3806365")] = 2
+        elseif (CheckCheckBox -CheckBox $NoRecoveryMM) {
+            if (CheckCheckBox -CheckBox $1xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x40")
+            }
+            elseif (CheckCheckBox -CheckBox $2xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x80")
+            }
+            elseif (CheckCheckBox -CheckBox $4xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x29")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0xC0")
+            }
+            elseif (CheckCheckBox -CheckBox $8xDamageMM) {
+                $ByteArray[(GetDecimal -Hex "0xBABEA2")] = (GetDecimal -Hex "0x2A")
+                $ByteArray[(GetDecimal -Hex "0xBABEA3")] = (GetDecimal -Hex "0x00")
+            }
+            $ByteArray[(GetDecimal -Hex "0xBABEA5")] = (GetDecimal -Hex "0x05")
+            $ByteArray[(GetDecimal -Hex "0xBABEA6")] = (GetDecimal -Hex "0x29")
+            $ByteArray[(GetDecimal -Hex "0xBABEA7")] = (GetDecimal -Hex "0x43")
         }
-        elseif (CheckCheckBox -CheckBox $HideDPadMM) {
-            $ByteArray[(GetDecimal -Hex "0x3806365")] = 0
-        }
-
-
-
-        # GRAPHICS #
-
-        if (CheckCheckBox -CheckBox $WideScreenMM) {
-            $ByteArray[(GetDecimal -Hex "0xBD5D74")] = (GetDecimal -Hex "0x3C")
-            $ByteArray[(GetDecimal -Hex "0xBD5D75")] = (GetDecimal -Hex "0x07")
-            $ByteArray[(GetDecimal -Hex "0xBD5D76")] = (GetDecimal -Hex "0x3F")
-            $ByteArray[(GetDecimal -Hex "0xBD5D77")] = (GetDecimal -Hex "0xE3")
-
-            $ByteArray[(GetDecimal -Hex "0xCA58F5")] = (GetDecimal -Hex "0x6C")
-            $ByteArray[(GetDecimal -Hex "0xCA58F7")] = (GetDecimal -Hex "0x53")
-            $ByteArray[(GetDecimal -Hex "0xCA58F9")] = (GetDecimal -Hex "0x6C")
-            $ByteArray[(GetDecimal -Hex "0xCA58FB")] = (GetDecimal -Hex "0x84")
-            $ByteArray[(GetDecimal -Hex "0xCA58FD")] = (GetDecimal -Hex "0x9E")
-            $ByteArray[(GetDecimal -Hex "0xCA58FF")] = (GetDecimal -Hex "0xB7")
-            $ByteArray[(GetDecimal -Hex "0xCA5901")] = (GetDecimal -Hex "0x53")
-            $ByteArray[(GetDecimal -Hex "0xCA5903")] = (GetDecimal -Hex "0x6C")
-        }
-
-        if (CheckCheckBox -CheckBox $ExtendedDrawMM) {
-            $ByteArray[(GetDecimal -Hex "0xB50874")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB50875")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB50876")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB50877")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $BlackBarsMM) {
-            $ByteArray[(GetDecimal -Hex "0xBF72A4")] = 0
-            $ByteArray[(GetDecimal -Hex "0xBF72A5")] = 0
-            $ByteArray[(GetDecimal -Hex "0xBF72A6")] = 0
-            $ByteArray[(GetDecimal -Hex "0xBF72A7")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $PixelatedStarsMM) {
-            $ByteArray[(GetDecimal -Hex "0xB943FC")] = (GetDecimal -Hex "0x10")
-            $ByteArray[(GetDecimal -Hex "0xB943FD")] = 0
-        }
-
-
-
-        # EQUIPMENT #
-
-        if (CheckCheckBox -CheckBox $ReducedItemCapacityMM) {
-            $ByteArray[(GetDecimal -Hex "0xC5834F")] = 20
-            $ByteArray[(GetDecimal -Hex "0xC58351")] = 25
-            $ByteArray[(GetDecimal -Hex "0xC58353")] = 30
-            $ByteArray[(GetDecimal -Hex "0xC58357")] = 10
-            $ByteArray[(GetDecimal -Hex "0xC58359")] = 15
-            $ByteArray[(GetDecimal -Hex "0xC5835B")] = 20
-            $ByteArray[(GetDecimal -Hex "0xC5837F")] = 5
-            $ByteArray[(GetDecimal -Hex "0xC58381")] = 10
-            $ByteArray[(GetDecimal -Hex "0xC58383")] = 15
-            $ByteArray[(GetDecimal -Hex "0xC58387")] = 10
-            $ByteArray[(GetDecimal -Hex "0xC58389")] = 15
-            $ByteArray[(GetDecimal -Hex "0xC5838B")] = 20
-        }
-        elseif (CheckCheckBox -CheckBox $IncreasedIemCapacityMM) {
-            $ByteArray[(GetDecimal -Hex "0xC5834F")] = 40
-            $ByteArray[(GetDecimal -Hex "0xC58351")] = 70
-            $ByteArray[(GetDecimal -Hex "0xC58353")] = 99
-            $ByteArray[(GetDecimal -Hex "0xC58357")] = 30
-            $ByteArray[(GetDecimal -Hex "0xC58359")] = 55
-            $ByteArray[(GetDecimal -Hex "0xC5835B")] = 80
-            $ByteArray[(GetDecimal -Hex "0xC5837F")] = 15
-            $ByteArray[(GetDecimal -Hex "0xC58381")] = 30
-            $ByteArray[(GetDecimal -Hex "0xC58383")] = 45
-            $ByteArray[(GetDecimal -Hex "0xC58387")] = 30
-            $ByteArray[(GetDecimal -Hex "0xC58389")] = 55
-            $ByteArray[(GetDecimal -Hex "0xC5838B")] = 80
-        }
-
-        if (CheckCheckBox -CheckBox $RazorSwordMM) {
-            # Prevent losing hits
-            $ByteArray[(GetDecimal -Hex "0xCBA496")] = 0
-            $ByteArray[(GetDecimal -Hex "0xCBA497")] = 0
-
-            # Keep sword after Song of Time
-            $ByteArray[(GetDecimal -Hex "0xBDA6B7")] = 1
-        }
-
-
-
-        # OTHER #
-
-        if (CheckCheckBox -CheckBox $DisableLowHPSoundMM) {
-            $ByteArray[(GetDecimal -Hex "0xB97E2A")] = 0
-            $ByteArray[(GetDecimal -Hex "0xB97E2B")] = 0
-        }
-
-        if (CheckCheckBox -CheckBox $PieceOfHeartSoundMM) {
-            $ByteArray[(GetDecimal -Hex "0xBA94C8")] = (GetDecimal -Hex "0x10")
-            $ByteArray[(GetDecimal -Hex "0xBA94C9")] = (GetDecimal -Hex "0x00")
-        }
-
     }
 
-    [io.file]::WriteAllBytes($DecompressedROMFile, $ByteArray)
+
+
+    # D-PAD #
+
+    if (CheckCheckBox -CheckBox $LeftDPadMM)        { $ByteArray[(GetDecimal -Hex "0x3806365")] = 1  }
+    elseif (CheckCheckBox -CheckBox $RightDPadMM)   { $ByteArray[(GetDecimal -Hex "0x3806365")] = 2 }
+    elseif (CheckCheckBox -CheckBox $HideDPadMM)    { $ByteArray[(GetDecimal -Hex "0x3806365")] = 0 }
+
+
+
+    # GRAPHICS #
+
+    if (CheckCheckBox -CheckBox $WideScreenMM) {
+        $ByteArray[(GetDecimal -Hex "0xBD5D74")] = (GetDecimal -Hex "0x3C")
+        $ByteArray[(GetDecimal -Hex "0xBD5D75")] = (GetDecimal -Hex "0x07")
+        $ByteArray[(GetDecimal -Hex "0xBD5D76")] = (GetDecimal -Hex "0x3F")
+        $ByteArray[(GetDecimal -Hex "0xBD5D77")] = (GetDecimal -Hex "0xE3")
+
+        $ByteArray[(GetDecimal -Hex "0xCA58F5")] = (GetDecimal -Hex "0x6C")
+        $ByteArray[(GetDecimal -Hex "0xCA58F7")] = (GetDecimal -Hex "0x53")
+        $ByteArray[(GetDecimal -Hex "0xCA58F9")] = (GetDecimal -Hex "0x6C")
+        $ByteArray[(GetDecimal -Hex "0xCA58FB")] = (GetDecimal -Hex "0x84")
+        $ByteArray[(GetDecimal -Hex "0xCA58FD")] = (GetDecimal -Hex "0x9E")
+        $ByteArray[(GetDecimal -Hex "0xCA58FF")] = (GetDecimal -Hex "0xB7")
+        $ByteArray[(GetDecimal -Hex "0xCA5901")] = (GetDecimal -Hex "0x53")
+        $ByteArray[(GetDecimal -Hex "0xCA5903")] = (GetDecimal -Hex "0x6C")
+    }
+
+    if (CheckCheckBox -CheckBox $ExtendedDrawMM) {
+        $ByteArray[(GetDecimal -Hex "0xB50874")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB50875")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB50876")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB50877")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $BlackBarsMM) {
+        $ByteArray[(GetDecimal -Hex "0xBF72A4")] = 0
+        $ByteArray[(GetDecimal -Hex "0xBF72A5")] = 0
+        $ByteArray[(GetDecimal -Hex "0xBF72A6")] = 0
+        $ByteArray[(GetDecimal -Hex "0xBF72A7")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $PixelatedStarsMM) {
+        $ByteArray[(GetDecimal -Hex "0xB943FC")] = (GetDecimal -Hex "0x10")
+        $ByteArray[(GetDecimal -Hex "0xB943FD")] = 0
+    }
+
+
+
+    # EQUIPMENT #
+
+    if (CheckCheckBox -CheckBox $ReducedItemCapacityMM) {
+        $ByteArray[(GetDecimal -Hex "0xC5834F")] = 20
+        $ByteArray[(GetDecimal -Hex "0xC58351")] = 25
+        $ByteArray[(GetDecimal -Hex "0xC58353")] = 30
+        $ByteArray[(GetDecimal -Hex "0xC58357")] = 10
+        $ByteArray[(GetDecimal -Hex "0xC58359")] = 15
+        $ByteArray[(GetDecimal -Hex "0xC5835B")] = 20
+        $ByteArray[(GetDecimal -Hex "0xC5837F")] = 5
+        $ByteArray[(GetDecimal -Hex "0xC58381")] = 10
+        $ByteArray[(GetDecimal -Hex "0xC58383")] = 15
+        $ByteArray[(GetDecimal -Hex "0xC58387")] = 10
+        $ByteArray[(GetDecimal -Hex "0xC58389")] = 15
+        $ByteArray[(GetDecimal -Hex "0xC5838B")] = 20
+    }
+    elseif (CheckCheckBox -CheckBox $IncreasedIemCapacityMM) {
+        $ByteArray[(GetDecimal -Hex "0xC5834F")] = 40
+        $ByteArray[(GetDecimal -Hex "0xC58351")] = 70
+        $ByteArray[(GetDecimal -Hex "0xC58353")] = 99
+        $ByteArray[(GetDecimal -Hex "0xC58357")] = 30
+        $ByteArray[(GetDecimal -Hex "0xC58359")] = 55
+        $ByteArray[(GetDecimal -Hex "0xC5835B")] = 80
+        $ByteArray[(GetDecimal -Hex "0xC5837F")] = 15
+        $ByteArray[(GetDecimal -Hex "0xC58381")] = 30
+        $ByteArray[(GetDecimal -Hex "0xC58383")] = 45
+        $ByteArray[(GetDecimal -Hex "0xC58387")] = 30
+        $ByteArray[(GetDecimal -Hex "0xC58389")] = 55
+        $ByteArray[(GetDecimal -Hex "0xC5838B")] = 80
+    }
+
+    if (CheckCheckBox -CheckBox $RazorSwordMM) {
+        $ByteArray[(GetDecimal -Hex "0xCBA496")] = 0 # Prevent losing hits
+        $ByteArray[(GetDecimal -Hex "0xCBA497")] = 0
+        $ByteArray[(GetDecimal -Hex "0xBDA6B7")] = 1 # Keep sword after Song of Time
+    }
+
+
+
+    # OTHER #
+    
+    if (CheckCheckBox -CheckBox $DisableLowHPSoundMM) {
+        $ByteArray[(GetDecimal -Hex "0xB97E2A")] = 0
+        $ByteArray[(GetDecimal -Hex "0xB97E2B")] = 0
+    }
+
+    if (CheckCheckBox -CheckBox $PieceOfHeartSoundMM) {
+        $ByteArray[(GetDecimal -Hex "0xBA94C8")] = (GetDecimal -Hex "0x10")
+        $ByteArray[(GetDecimal -Hex "0xBA94C9")] = (GetDecimal -Hex "0x00")
+    }
+
+
+
+    # Finished
+    return $ByteArray
 
 }
-
 
 
 #==============================================================================================================================================================================================
@@ -1587,8 +1627,8 @@ function ExtendROM() {
 #==============================================================================================================================================================================================
 function CheckGameID() {
     
-    # Return if freely patching or extracting
-    if ($GameType -eq "Free" -or $GetCommand -eq "Extract" -or $GetCommand -eq "Patch VC") { return $True }
+    # Return if freely patching, injecting or extracting
+    if ($GameType -eq "Free" -or $GetCommand -eq "Inject" -or $GetCommand -eq "Extract" -or $GetCommand -eq "Patch VC") { return $True }
 
     # Set the status label.
     UpdateStatusLabelDuringPatching -Text 'Checking GameID in .tmd...'
@@ -1633,17 +1673,9 @@ function CheckGameID() {
 #==============================================================================================================================================================================================
 function SetCustomGameID() {
     
-    if (!(CheckCheckBox -CheckBox $InputCustomGameIDCheckbox)) {
-        return
-    }
-
-    if ($InputCustomGameIDTextbox.TextLength -eq 4) {
-        $GameID = $InputCustomGameIDTextBox.Text
-    }
-
-    if ($InputCustomChannelTitleTextBox.TextLength -gt 0 -and $GameType -ne "Free") {
-        $ChannelTitle = $InputCustomChannelTitleTextBox.Text
-    }
+    if (!$InputCustomGameIDCheckbox.Checked -and !$IsWiiVC)                           { return }
+    if ($InputCustomGameIDTextbox.TextLength -eq 4)                                   { $global:GameID = $InputCustomGameIDTextBox.Text }
+    if ($InputCustomChannelTitleTextBox.TextLength -gt 0 -and $GameType -ne "Free")   { $global:ChannelTitle = $InputCustomChannelTitleTextBox.Text }
 
 }
 
@@ -1872,21 +1904,21 @@ function RepackWADFile() {
     # Loop through all files in the extracted WAD folder.
     foreach($File in Get-ChildItem -LiteralPath $WadFile.Folder -Force) {
         # Move the file to the same folder as the unpacker tool.
-        Move-Item -LiteralPath $File.FullName -Destination $MasterPath
+        Move-Item -LiteralPath $File.FullName -Destination $WiiVCPath
         
         # Create an entry for the database.
-        $ListEntry = $MasterPath + '\' + $File.Name
+        $ListEntry = $RepackPath + '\' + $File.Name
         
         # Some files need to be fed into the tool so keep track of them.
         switch ($File.Extension) {
-            '.tik'  { $tik  = $MasterPath + '\' + $File.Name }
-            '.tmd'  { $tmd  = $MasterPath + '\' + $File.Name }
-            '.cert' { $cert = $MasterPath + '\' + $File.Name }
+            '.tik'  { $tik  = $WiiVCPath + '\' + $File.Name }
+            '.tmd'  { $tmd  = $WiiVCPath + '\' + $File.Name }
+            '.cert' { $cert = $WiiVCPath + '\' + $File.Name }
         }
     }
 
     # We need to be in the same path as some files so just jump there.
-    Push-Location $MasterPath
+    Push-Location $WiiVCPath
 
     # Repack the WAD using the new files.
     & $Files.wadpacker $tik $tmd $cert $WadFile.Patched '-sign' '-i' $GameID
@@ -1900,14 +1932,9 @@ function RepackWADFile() {
         UpdateStatusLabelDuringPatching -Text 'Complete! File successfully patched.'
     }
     # If the patched file failed to be created, set the status label to failed.
-    elseif ($IsWiiVC) {
-        UpdateStatusLabelDuringPatching -Text 'Failed! Patched Wii VC WAD was not created.'
-    }
-    else {
-        UpdateStatusLabelDuringPatching -Text 'Failed! Nintendo 64 ROM was not patched.'
-    }
+    UpdateStatusLabelDuringPatching -Text "Failed! Patched Wii VC WAD was not created."
 
-    # Remove the folder the extracted files were in.
+    # Remove the folder the extracted files were in, and delete files
     RemovePath -LiteralPath $WadFile.Folder
 
     # Doesn't matter, but return to where we were.
@@ -1921,19 +1948,14 @@ function RepackWADFile() {
 function EnablePatchButtons([boolean]$Enable) {
     
     # Set the status that we are ready to roll... Or not...
-    if ($Enable) {
-        $StatusLabel.Text = 'Ready to patch!'
-    }
-    elseif ($IsWiiVC) {
-        $StatusLabel.Text = 'Select your Virtual Console WAD file to continue.'
-    }
-    else {
-        $StatusLabel.Text = 'Select your Nintendo 64 ROM file to continue.'
-        
-    }
+    if ($Enable)        { $StatusLabel.Text = 'Ready to patch!' }
+    elseif ($IsWiiVC)   { $StatusLabel.Text = 'Select your Virtual Console WAD file to continue.' }
+    else                { $StatusLabel.Text = 'Select your Nintendo 64 ROM file to continue.' }
 
-    if ($IsWiiVC) { $InjectROMButton.Enabled = ($WADFilePath -ne $null -and $Z64FilePath -ne $null) }
-    if ($IsWiiVC) { $PatchBPSButton.Enabled = ($WADFilePath -ne $null -and $BPSFilePath -ne $null) } else { $PatchBPSButton.Enabled = ($Z64FilePath -ne $null -and $BPSFilePath -ne $null) }
+    if ($IsWiiVC)      {
+        $InjectROMButton.Enabled = ($WADFilePath -ne $null -and $Z64FilePath -ne $null)
+        $PatchBPSButton.Enabled = ($WADFilePath -ne $null -and $BPSFilePath -ne $null) } else { $PatchBPSButton.Enabled = ($Z64FilePath -ne $null -and $BPSFilePath -ne $null)
+   }
     
     # Enable patcher buttons.
     $PatchOoTReduxButton.Enabled = $Enable
@@ -2186,7 +2208,7 @@ function CreateMainDialog() {
     $MainDialog.StartPosition = "CenterScreen"
     $MainDialog.KeyPreview = $true
     $MainDialog.Add_Shown({ $MainDialog.Activate() })
-    $MainDialog.Icon = $VIcon
+    $MainDialog.Icon = $Icons.V
 
     # Create ToolTip
     $ToolTip = CreateToolTip
@@ -2250,7 +2272,7 @@ function CreateMainDialog() {
     
     # Create a button to allow patch the WAD with a ROM file.
     $global:InjectROMButton = CreateButton -X 495 -Y 18 -Width 80 -Height 22 -Text "Inject ROM" -ToolTip $ToolTip -Info "Replace the ROM in your selected WAD File with your selected Z64, N64 or V64 ROM File" -AddTo $InputROMGroup
-    $InjectROMButton.Add_Click({ MainFunctionPatch -Command "Inject" -Id $null -Title $null -Patch $BPSFilePath -PatchedFile '_injected' -Hash $null -Compress $False })
+    $InjectROMButton.Add_Click({ MainFunctionPatch -Command "Inject" -Id $null -Title $null -Patch $null -PatchedFile '_injected' -Hash $null -Compress $False })
 
 
 
@@ -2335,42 +2357,47 @@ function CreateMainDialog() {
     #####################
 
     # Create a panel to contain everything for SM64.
-    $global:PatchOoTPanel = CreatePanel -Width 590 -Height 120 -AddTo $MainDialog
+    $global:PatchOoTPanel = CreatePanel -Width 590 -Height 170 -AddTo $MainDialog
 
     # Create a groupbox to show the OoT patching buttons.
-    $PatchOoTGroup = CreateGroupBox -Width $PatchOoTPanel.Width -Height $PatchOoTPanel.Height -Text "Ocarina of Time - Patch Buttons" -AddTo $PatchOoTPanel
+    $PatchOoTReduxGroup = CreateGroupBox -Width ($PatchOoTPanel.Width/2-5) -Height ($PatchOoTPanel.Height/2) -Text "Ocarina of Time - REDUX Buttons" -AddTo $PatchOoTPanel
 
     # Create a button to allow patching the WAD (OoT Redux).
-    $global:PatchOoTReduxButton = CreateButton -X 135 -Y 25 -Width 80 -Height 35 -Text "OoT Redux" -ToolTip $ToolTip -Info "A romhack that improves mechanics for Ocarina of Time`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports rev0 US ROM File only" -AddTo $PatchOoTGroup
-    $PatchOoTReduxButton.Add_Click({ MainFunctionOoTRedux -Command "Redux" -Hash $HashSum_oot_rev0 -Compress $True })
+    $global:PatchOoTReduxButton = CreateButton -X 75 -Y 30 -Width 100 -Height 35 -Text "OoT Redux" -ToolTip $ToolTip -Info "A romhack that improves mechanics for Ocarina of Time`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports rev0 US ROM File only" -AddTo $PatchOoTReduxGroup
+    $PatchOoTReduxButton.Add_Click({ MainFunctionOoTRedux -Command "Downgrade" -Hash $HashSum_oot_rev0 -Compress $True })
 
     # Create a button to select additional Redux options.
-    $global:PatchOoTReduxOptionsButton = CreateButton -X $PatchOoTReduxButton.Right -Y $PatchOoTReduxButton.Top -Width 20 -Height 35 -Text "+" -ToolTip $ToolTip -Info "Toggle additional features for the Ocarina of Time REDUX romhack" -AddTo $PatchOoTGroup
+    $global:PatchOoTReduxOptionsButton = CreateButton -X $PatchOoTReduxButton.Right -Y 30 -Width 40 -Height 35 -Text "+" -ToolTip $ToolTip -Info "Toggle additional features for the Ocarina of Time REDUX romhack" -AddTo $PatchOoTReduxGroup
     $PatchOoTReduxOptionsButton.Add_Click({ $OoTReduxOptionsDialog.ShowDialog() })
 
+    # Create a groupbox to show the OoT patching buttons.
+    $PatchOoTHackGroup = CreateGroupBox -X ($PatchOoTReduxGroup.Right + 10)  -Width ($PatchOoTPanel.Width/2-5) -Height ($PatchOoTPanel.Height/2) -Text "Ocarina of Time - ROM Hack Buttons" -AddTo $PatchOoTPanel
+
     # Create a button to allow patching the WAD (OoT Dawn and Dusk).
-    $global:PatchOoTDawnButton = CreateButton -X ($PatchOoTReduxOptionsButton.Right + 15) -Y $PatchOoTReduxOptionsButton.Top -Width 100 -Height 35 -Text "Dawn and Dusk" -ToolTip $ToolTip -Info "A small-sized romhack in a completely new setting`nSupports rev0, rev1 or rev2 US ROM Files" -AddTo $PatchOoTGroup
+    $global:PatchOoTDawnButton = CreateButton -X 35 -Y 30 -Width 100 -Height 35 -Text "Dawn and Dusk" -ToolTip $ToolTip -Info "A small-sized romhack in a completely new setting`nSupports rev0, rev1 or rev2 US ROM Files" -AddTo $PatchOoTHackGroup
     $PatchOoTDawnButton.Add_Click({ MainFunctionPatch -Command "No Downgrade" -Id "NAC1" -Title "Zelda: Dawn & Dusk" -Patch $Files.bpspatch_oot_dawn_rev0 -PatchedFile '_dawn_&_dusk_patched' -Hash "Dawn & Dusk" -Compress $False })
 
     # Create a button to allow patching the WAD (OoT The Fate of the Bombiwa).
-    $global:PatchOoTBombiwaButton = CreateButton -X ($PatchOoTDawnButton.Right + 15) -Y $PatchOoTDawnButton.Top -Width 100 -Height 35 -Text "Bombiwa" -ToolTip $ToolTip -Info "A small-sized romhack in a completely new setting, and extremely tricky and difficult`nSupports rev0 US ROM File only" -AddTo $PatchOoTGroup
+    $global:PatchOoTBombiwaButton = CreateButton -X ($PatchOoTDawnButton.Right + 15) -Y 30 -Width 100 -Height 35 -Text "Bombiwa" -ToolTip $ToolTip -Info "A small-sized romhack in a completely new setting, and extremely tricky and difficult`nSupports rev0 US ROM File only" -AddTo $PatchOoTHackGroup
     $PatchOoTBombiwaButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NAC2" -Title "Zelda: Bombiwa" -Patch $Files.bpspatch_oot_bombiwa -PatchedFile '_bombiwa_patched' -Hash $HashSum_oot_rev0 -Compress $True })
 
+    # Create a groupbox to show the OoT patching buttons.
+    $PatchOoTTranslationGroup = CreateGroupBox -Y $PatchOoTReduxGroup.Bottom -Width $PatchOoTPanel.Width -Height ($PatchOoTPanel.Height/2) -Text "Ocarina of Time - Translation Buttons" -AddTo $PatchOoTPanel
+
     # Create a button to allow patching the WAD (OoT Spanish).
-    $global:PatchOoTSpaButton = CreateButton -X 75 -Y 70 -Width 100 -Height 35 -Text "Spanish Translation" -ToolTip $ToolTip -Info "Spanish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTGroup
+    $global:PatchOoTSpaButton = CreateButton -X 50 -Y 30 -Width 100 -Height 35 -Text "Spanish Translation" -ToolTip $ToolTip -Info "Spanish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
     $PatchOoTSpaButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACS" -Title "Zelda: Ocarina (SPA)" -Patch $Files.bpspatch_oot_spa -PatchedFile "_spanish_patched" -Hash $HashSum_oot_rev0 -Compress $True })
 
     # Create a button to allow patching the WAD (OoT Polish).
-    $global:PatchOoTPolButton = CreateButton -X ($PatchOoTSpaButton.Right + 15) -Y $PatchOoTSpaButton.Top -Width 100 -Height 35 -Text "Polish Translation" -ToolTip $ToolTip -Info "" -AddTo $PatchOoTGroup
+    $global:PatchOoTPolButton = CreateButton -X ($PatchOoTSpaButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Polish Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
     $PatchOoTPolButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACO" -Title "Zelda: Ocarina (POL)" -Patch $Files.bpspatch_oot_pol -PatchedFile "_polish_patched" -Hash $HashSum_oot_rev0 -Compress $True })
-    $ToolTip.SetToolTip($PatchOoTPolButton, "Polish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only")
 
     # Create a button to allow patching the WAD (OoT Russian).
-    $global:PatchOoTRusButton = CreateButton -X ($PatchOoTPolButton.Right + 15) -Y $PatchOoTSpaButton.Top -Width 100 -Height 35 -Text "Russian Translation" -ToolTip $ToolTip -Info "Russian Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTGroup
+    $global:PatchOoTRusButton = CreateButton -X ($PatchOoTPolButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Russian Translation" -ToolTip $ToolTip -Info "Russian Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
     $PatchOoTRusButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACR" -Title "Zelda: Ocarina (RUS)" -Patch $Files.bpspatch_oot_rus -PatchedFile '_russian_patched' -Hash $HashSum_oot_rev0 -Compress $False })
 
     # Create a button to allow patching the WAD (OoT Chinese Simplified).
-    $global:PatchOoTChiButton = CreateButton -X ($PatchOoTRusButton.Right + 15) -Y $PatchOoTSpaButton.Top -Width 100 -Height 35 -Text "Chinese Translation" -ToolTip $ToolTip -Info "Chinese Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTGroup
+    $global:PatchOoTChiButton = CreateButton -X ($PatchOoTRusButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Chinese Translation" -ToolTip $ToolTip -Info "Chinese Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
     $PatchOoTChiButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACC" -Title "Zelda: Ocarina (CHI)" -Patch $Files.bpspatch_oot_chi -PatchedFile "_chinese_patched" -Hash $HashSum_oot_rev0 -Compress $True })
 
 
@@ -2380,30 +2407,36 @@ function CreateMainDialog() {
     ####################
 
     # Create a panel to contain everything for SM64.
-    $global:PatchMMPanel = CreatePanel -Width 590 -Height 120 -AddTo $MainDialog
+    $global:PatchMMPanel = CreatePanel -Width 590 -Height 170 -AddTo $MainDialog
 
     # Create a groupbox to show the MM patching buttons.
-    $PatchMMGroup = CreateGroupBox -Width $PatchMMPanel.Width -Height $PatchMMPanel.Height -Text "Majora's Mask - Patch Buttons" -AddTo $PatchMMPanel
+    $PatchMMReduxGroup = CreateGroupBox -Width ($PatchMMPanel.Width/2-5) -Height ($PatchMMPanel.Height/2) -Text "Majora's Mask - REDUX Buttons" -AddTo $PatchMMPanel
 
     # Create a button to allow patching the WAD (MM Redux).
-    $global:PatchMMReduxButton = CreateButton -X 190 -Y 25 -Width 80 -Height 35 -Text "MM Redux" -ToolTip $ToolTip -Info "A romhack that improves mechanics for Majorea's Mask`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports US ROM File only" -AddTo $PatchMMGroup
+    $global:PatchMMReduxButton = CreateButton -X 75 -Y 30 -Width 100 -Height 35 -Text "MM Redux" -ToolTip $ToolTip -Info "A romhack that improves mechanics for Majorea's Mask`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports US ROM File only" -AddTo $PatchMMReduxGroup
     $PatchMMReduxButton.Add_Click({ MainFunctionMMRedux -Command $null -Hash $HashSum_mm -Compress $True })
 
     # Create a button to select additional Redux options.
-    $global:PatchMMReduxOptionsButton = CreateButton -X $PatchMMReduxButton.Right -Y $PatchMMReduxButton.Top -Width 20 -Height 35 -Text "+" -ToolTip $ToolTip -Info "Toggle additional features for the Majora's Mask REDUX romhack" -AddTo $PatchMMGroup
+    $global:PatchMMReduxOptionsButton = CreateButton -X $PatchMMReduxButton.Right -Y 30 -Width 40 -Height 35 -Text "+" -ToolTip $ToolTip -Info "Toggle additional features for the Majora's Mask REDUX romhack" -AddTo $PatchMMReduxGroup
     $PatchMMReduxOptionsButton.Add_Click({ $MMReduxOptionsDialog.ShowDialog() })
 
+    # Create a groupbox to show the MM patching buttons.
+    $PatchMMHackGroup = CreateGroupBox -X ($PatchMMReduxGroup.Right + 10) -Width ($PatchMMPanel.Width/2-5) -Height ($PatchMMPanel.Height/2) -Text "Majora's Mask - ROM Hack Buttons" -AddTo $PatchMMPanel
+
     # Create a button to allow patching the WAD (MM Masked Quest).
-    $global:PatchMMMaskedQuestButton = CreateButton -X ($PatchMMReduxButton.Right + 35) -Y $PatchMMReduxButton.Top -Width 100 -Height 35 -Text "Masked Quest" -ToolTip $ToolTip -Info "A Master Quest style romhack for Majora's Mask, offering a higher difficulty`nSupports US ROM File only" -AddTo $PatchMMGroup
+    $global:PatchMMMaskedQuestButton = CreateButton -X 100 -Y 30 -Width 100 -Height 35 -Text "Masked Quest" -ToolTip $ToolTip -Info "A Master Quest style romhack for Majora's Mask, offering a higher difficulty`nSupports US ROM File only" -AddTo $PatchMMHackGroup
     $PatchMMMaskedQuestButton.Add_Click({ MainFunctionPatchRemap -Command $null -Id "NAR1" -Title "Zelda: Masked Quest" -Patch $Files.bpspatch_mm_masked_quest -PatchedFile "_masked_quest_patched" -Hash $HashSum_mm -Compress $False })
 
+    # Create a groupbox to show the MM patching buttons.
+    $PatchMMTranslationGroup = CreateGroupBox -Y $PatchMMReduxGroup.Bottom -Width $PatchMMPanel.Width -Height ($PatchMMPanel.Height/2) -Text "Majora's Mask - Translation Buttons" -AddTo $PatchMMPanel
+
     # Create a button to allow patching the WAD (MM Polish).
-    $global:PatchMMPolButton = CreateButton -X $PatchMMReduxButton.Left -Y ($PatchMMReduxButton.Bottom + 10) -Width 100 -Height 35 -Text "Polish Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only" -AddTo $PatchMMGroup
+    $global:PatchMMPolButton = CreateButton -X 180 -Y 30 -Width 100 -Height 35 -Text "Polish Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only" -AddTo $PatchMMTranslationGroup
     $PatchMMPolButton.Size = New-Object System.Drawing.Size(100, 35)
     $PatchMMPolButton.Add_Click({ MainFunctionPatch -Command $null -Id "NARO" -Title "Zelda: Majora's (POL)" -Patch $Files.bpspatch_mm_pol -PatchedFile "_polish_patched" -Hash $HashSum_mm_ -Compress $True })
 
     # Create a button to allow patching the WAD (MM Russian).
-    $global:PatchMMRusButton = CreateButton -X ($PatchMMPolButton.Right + 15) -Y $PatchMMPolButton.Top -Width 100 -Height 35 -Text "Russian Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only" -AddTo $PatchMMGroup
+    $global:PatchMMRusButton = CreateButton -X ($PatchMMPolButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Russian Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only" -AddTo $PatchMMTranslationGroup
     $PatchMMRusButton.Add_Click({ MainFunctionPatch -Command $null -Id "NARR" -Title "Zelda: Majora's (RUS)" -Patch $Files.bpspatch_mm_rus -PatchedFile "_russian_patched" -Hash $HashSum_mm -Compress $False })
 
 
@@ -2413,7 +2446,7 @@ function CreateMainDialog() {
     ######################
 
     # Create a panel to contain everything for SM64.
-    $global:PatchSM64Panel = CreatePanel -Width 590 -Height 120 -AddTo $MainDialog
+    $global:PatchSM64Panel = CreatePanel -Width 590 -Height 80 -AddTo $MainDialog
 
     # Create a groupbox to show the SM64 patching buttons.
     $PatchSM64Group = CreateGroupBox -Width $PatchSM64Panel.Width -Height $PatchSM64Panel.Height -Text "Super Mario 64 - Patch Buttons" -AddTo $PatchSM64Panel
@@ -2438,7 +2471,7 @@ function CreateMainDialog() {
     ####################
 
     # Create a panel to contain everything for PP.
-    $global:PatchPPPanel = CreatePanel -Width 590 -Height 120 -AddTo $MainDialog
+    $global:PatchPPPanel = CreatePanel -Width 590 -Height 80 -AddTo $MainDialog
 
     # Create a groupbox to show the PP patching buttons.
     $PatchPPGroup = CreateGroupBox -Width $PatchPPPanel.Width -Height $PatchPPPanel.Height -Text "Paper Mario - Patch Buttons" -AddTo $PatchPPPanel
@@ -2652,8 +2685,11 @@ function SetMainScreenSize() {
         $PatchSM64Panel.Location = New-Object System.Drawing.Size(10, ($CustomGameIDPanel.Bottom + 5))
         $PatchPPPanel.Location = New-Object System.Drawing.Size(10, ($CustomGameIDPanel.Bottom + 5))
 
-        if ($GameType -ne "Free")   { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($PatchOoTPanel.Bottom + 5)) }
-        else                        { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($CustomGameIDPanel.Bottom + 5)) }
+        if ($GameType -eq "Ocarina of Time")      { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($PatchOoTPanel.Bottom + 5)) }
+        elseif ($GameType -eq "Majora's Mask")    { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($PatchMMPanel.Bottom + 5)) }
+        elseif ($GameType -eq "Super Mario 64")   { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($PatchSM64Panel.Bottom + 5)) }
+        elseif ($GameType -eq "Paper Mario")      { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($PatchPPPanel.Bottom + 5)) }
+        else                                      { $PatchVCPanel.Location = New-Object System.Drawing.Size(10, ($CustomGameIDPanel.Bottom + 5)) }
 
         $MiscPanel.Location = New-Object System.Drawing.Size(10, ($PatchVCPanel.Bottom + 5))
 
@@ -2672,8 +2708,11 @@ function SetMainScreenSize() {
         $PatchSM64Panel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5))
         $PatchPPPanel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5))
 
-        if ($GameType -ne "Free")   { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($PatchOoTPanel.Bottom + 5)) }
-        else                        { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5)) }
+        if ($GameType -eq "Ocarina of Time")      { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($PatchOoTPanel.Bottom + 5)) }
+        elseif ($GameType -eq "Majora's Mask")    { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($PatchMMPanel.Bottom + 5)) }
+        elseif ($GameType -eq "Super Mario 64")   { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($PatchSM64Panel.Bottom + 5)) }
+        elseif ($GameType -eq "Paper Mario")      { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($PatchPPPanel.Bottom + 5)) }
+        else                                      { $MiscPanel.Location = New-Object System.Drawing.Size(10, ($InputBPSPanel.Bottom + 5)) }
 
     }
 
@@ -2701,29 +2740,29 @@ function ChangeGameMode([string]$Mode) {
     $global:GameType = $Mode
  
     if ($GameType -eq "Ocarina of Time") {
-        $global:GameID = "NACE"
+        $global:GameID = $OoT_US_GameID
         $global:ChannelTitle = "Zelda: Ocarina"
         $PatchOoTPanel.Visible = $InfoOcarinaOfTimeButton.Visible = $True
         $PatchVCDowngradeLabel.Visible = $PatchVCDowngrade.Visible = $PatchVCLeaveDPadUpLabel.Visible = $PatchVCLeaveDPadUp.Visible = $True
     }
     elseif ($GameType -eq "Majora's Mask") {
-        $global:GameID = "NARE"
+        $global:GameID = $MM_US_GameID
         $global:ChannelTitle = "Zelda: Majora's"
         $PatchMMPanel.Visible = $InfoMajorasMaskButton.Visible = $True
     }
     elseif ($GameType -eq "Super Mario 64") {
-        $global:GameID = "NAAE"
+        $global:GameID = $SM64_US_GameID
         $global:ChannelTitle = "Super Mario 64"
         $PatchSM64Panel.Visible = $InfoSuperMario64Button.Visible = $True
     }
     elseif ($GameType -eq "Paper Mario") {
-        $global:GameID = "NAEE"
+        $global:GameID = $PP_US_GameID
         $global:ChannelTitle = "Paper Mario"
         $PatchPPPanel.Visible = $InfoPaperMarioButton.Visible = $True
         
     }
     else {
-        $global:GameID = "CUST"
+        $global:GameID = $CUST_GameID
         $global:ChannelTitle = "Custom Channel"
         $InfoFreeButton.Show()
         $InputCustomChannelTitleTextBox.Visible = $InputCustomChannelTitleTextBoxLabel.Visible = $False
@@ -2836,7 +2875,7 @@ function CheckCheckBox([Object]$CheckBox) {
 function CreateOcarinaOfTimeReduxOptionsDialog() {
 
     # Create Dialog
-    $global:OoTReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $ZeldaIcon1
+    $global:OoTReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $Icons.Zelda1
     $CloseButton = CreateButton -X ($OoTReduxOptionsDialog.Width / 2 - 40) -Y ($OoTReduxOptionsDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $OoTReduxOptionsDialog
     $CloseButton.Add_Click({$OoTReduxOptionsDialog.Hide()})
 
@@ -2889,11 +2928,12 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     # GRAPHICS #
     $global:GraphicsBoxOoT             = CreateReduxGroup -Y ($TextBoxOoT.Bottom + 5) -Height 2 -Dialog $OoTReduxOptionsDialog -Text "Graphics"
     
-    $global:WidescreenOoT              = CreateReduxCheckbox -Column 0 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "16:9 Widescreen"        -Info "Native 16:9 Widescreen Display support"
-    $global:ExtendedDrawOoT            = CreateReduxCheckbox -Column 1 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "Extended Draw Distance" -Info "Increases the game's draw distance for objects`nDoes not work on all objects"
-    $global:BlackBarsOoT               = CreateReduxCheckbox -Column 2 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "No Black Bars"          -Info "Removes the black bars shown on the top and bottom of the screen during Z-targeting and cutscenes"
-    $global:ForceHiresModelOoT         = CreateReduxCheckbox -Column 3 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "Force Hires Link Model" -Info "Always use Link's High Resolution Model when Link is too far away"
-    $global:MMModelsOoT                = CreateReduxCheckbox -Column 0 -Row 2 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "Replace Link's Models"  -Info "Replaces Link's models to be styled towards Majora's Mask"
+    $global:WidescreenOoT              = CreateReduxCheckbox -Column 0 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "16:9 Widescreen"        -Info "Native 16:9 widescreen display support"
+    $global:WidescreenBackgroundsOoT   = CreateReduxCheckbox -Column 1 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "16:9 Backgrounds"       -Info "16:9 backgrounds suitable for native 16:9 widescreen display support"
+    $global:ExtendedDrawOoT            = CreateReduxCheckbox -Column 2 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "Extended Draw Distance" -Info "Increases the game's draw distance for objects`nDoes not work on all objects"
+    $global:BlackBarsOoT               = CreateReduxCheckbox -Column 3 -Row 1 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "No Black Bars"          -Info "Removes the black bars shown on the top and bottom of the screen during Z-targeting and cutscenes"
+    $global:ForceHiresModelOoT         = CreateReduxCheckbox -Column 0 -Row 2 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "Force Hires Link Model" -Info "Always use Link's High Resolution Model when Link is too far away"
+    $global:MMModelsOoT                = CreateReduxCheckbox -Column 1 -Row 2 -ToolTip $ToolTip -Group $GraphicsBoxOoT -Text "Replace Link's Models"  -Info "Replaces Link's models to be styled towards Majora's Mask"
 
 
 
@@ -2927,7 +2967,7 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
     $IncludeReduxLabel                 = CreateLabel -X $IncludeReduxOoT.Right -Y ($IncludeReduxOoT.Top + 3) -Width 135 -Height 15 -Text "Include Redux Patch" -ToolTip $ToolTip -Info "Include the base REDUX patch`nDisable this option to patch only the vanilla ROM with the above options" -AddTo $OoTReduxOptionsDialog
 
     $IncludeReduxOoT.Add_CheckStateChanged({
-        $GraphicsBoxOoT.Controls[4 * 2].Enabled = $IncludeReduxOoT.Checked
+        $GraphicsBoxOoT.Controls[5 * 2].Enabled = $IncludeReduxOoT.Checked
         $OtherBoxOoT.Controls[4 * 2].Enabled = $IncludeReduxOoT.Checked
     })
 
@@ -2939,7 +2979,7 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
 function CreateMajorasMaskReduxOptionsDialog() {
     
     # Create Dialog
-    $global:MMReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $ZeldaIcon2
+    $global:MMReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $Icons.Zelda2
     $CloseButton = CreateButton -X ($MMReduxOptionsDialog.Width / 2 - 40) -Y ($MMReduxOptionsDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $MMReduxOptionsDialog
     $CloseButton.Add_Click({$MMReduxOptionsDialog.Hide()})
 
@@ -3003,9 +3043,9 @@ function CreateMajorasMaskReduxOptionsDialog() {
     $global:EquipmentBoxMM             = CreateReduxGroup -Y ($GraphicsBoxMM.Bottom + 5) -Height 2 -Dialog $MMReduxOptionsDialog -Text "Equipment"
     
     $global:ItemCapacityPanelMM        = CreateReduxPanel -Row 0 -Group $EquipmentBoxMM 
-    $global:ReducedItemCapacityMM      = CreateReduxRadioButton -Column 0 -Row 0 -ToolTip $ToolTip -Panel $ItemCapacityPanelMM                -Text "Reduced Item Capacity"   -Info "Decrease the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry"
-    $global:NormalItemCapacityMM       = CreateReduxRadioButton -Column 1 -Row 0 -ToolTip $ToolTip -Panel $ItemCapacityPanelMM -Checked $True -Text "Normal Item Capacity"    -Info "Keep the normal amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry"
-    $global:IncreasedItemCapacityMM    = CreateReduxRadioButton -Column 2 -Row 0 -ToolTip $ToolTip -Panel $ItemCapacityPanelMM                -Text "Increased Item Capacity" -Info "Increase the amount of deku sticks, deku nuts, deku seeds, bombs and arrows you can carry"
+    $global:ReducedItemCapacityMM      = CreateReduxRadioButton -Column 0 -Row 0 -ToolTip $ToolTip -Panel $ItemCapacityPanelMM                -Text "Reduced Item Capacity"   -Info "Decrease the amount of deku sticks, deku nuts, bombs and arrows you can carry"
+    $global:NormalItemCapacityMM       = CreateReduxRadioButton -Column 1 -Row 0 -ToolTip $ToolTip -Panel $ItemCapacityPanelMM -Checked $True -Text "Normal Item Capacity"    -Info "Keep the normal amount of deku sticks, deku nuts, bombs and arrows you can carry"
+    $global:IncreasedItemCapacityMM    = CreateReduxRadioButton -Column 2 -Row 0 -ToolTip $ToolTip -Panel $ItemCapacityPanelMM                -Text "Increased Item Capacity" -Info "Increase the amount of deku sticks, deku nuts, bombs and arrows you can carry"
 
     $global:RazorSwordMM               = CreateReduxCheckbox -Column 0 -Row 2 -ToolTip $ToolTip -Group $EquipmentBoxMM -Text "Permanent Razor Sword" -Info "The Razor Sword won't get destroyed after 100 it`nYou can also keep the Razor Sword when traveling back in time"
 
@@ -3037,7 +3077,7 @@ function CreateMajorasMaskReduxOptionsDialog() {
 function CreateInfoGameIDDialog() {
     
     # Create Dialog
-    $global:InfoGameIDDialog = CreateDialog -Width 400 -Height 560 -Icon $SM64Icon1
+    $global:InfoGameIDDialog = CreateDialog -Width 400 -Height 560 -Icon $Icons.Mario1
     $CloseButton = CreateButton -X ($InfoGameIDDialog.Width / 2 - 40) -Y ($InfoGameIDDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoGameIDDialog
     $CloseButton.Add_Click({$InfoGameIDDialog.Hide()})
 
@@ -3098,7 +3138,7 @@ function CreateInfoGameIDDialog() {
 function CreateInfoOcarinaOfTimeDialog() {
     
     # Create Dialog
-    $global:InfoOcarinaOfTimeDialog = CreateDialog -Width 400 -Height 510 -Icon $ZeldaIcon2
+    $global:InfoOcarinaOfTimeDialog = CreateDialog -Width 400 -Height 510 -Icon $Icons.Zelda2
     $CloseButton = CreateButton -X ($InfoOcarinaOfTimeDialog.Width / 2 - 40) -Y ($InfoOcarinaOfTimeDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoOcarinaOfTimeDialog
     $CloseButton.Add_Click({$InfoOcarinaOfTimeDialog.Hide()})
 
@@ -3155,7 +3195,7 @@ function CreateInfoOcarinaOfTimeDialog() {
 function CreateInfoMajorasMaskDialog() {
     
     # Create Dialog
-    $global:InfoMajorasMaskDialog = CreateDialog -Width 400 -Height 540 -Icon $ZeldaIcon2
+    $global:InfoMajorasMaskDialog = CreateDialog -Width 400 -Height 540 -Icon $Icons.Zelda2
     $CloseButton = CreateButton -X ($InfoOcarinaOfTimeDialog.Width / 2 - 40) -Y ($InfoMajorasMaskDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoMajorasMaskDialog
     $CloseButton.Add_Click({$InfoMajorasMaskDialog.Hide()})
 
@@ -3214,7 +3254,7 @@ function CreateInfoMajorasMaskDialog() {
 function CreateInfoSuperMario64Dialog() {
     
     # Create Dialog
-    $global:InfoSuperMario64Dialog = CreateDialog -Width 400 -Height 500 -Icon $SM64Icon1
+    $global:InfoSuperMario64Dialog = CreateDialog -Width 400 -Height 500 -Icon $Icons.Mario1
     $CloseButton = CreateButton -X ($InfoSuperMario64Dialog.Width / 2 - 40) -Y ($InfoSuperMario64Dialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoSuperMario64Dialog
     $CloseButton.Add_Click({$InfoSuperMario64Dialog.Hide()})
 
@@ -3269,7 +3309,7 @@ function CreateInfoSuperMario64Dialog() {
 function CreateInfoPaperMarioDialog() {
     
      # Create Dialog
-    $global:InfoPaperMarioDialog = CreateDialog -Width 400 -Height 460 -Icon $SM64Icon2
+    $global:InfoPaperMarioDialog = CreateDialog -Width 400 -Height 460 -Icon $Icons.Mario2
     $CloseButton = CreateButton -X ($InfoPaperMarioDialog.Width / 2 - 40) -Y ($InfoPaperMarioDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoPaperMarioDialog
     $CloseButton.Add_Click({$InfoPaperMarioDialog.Hide()})
 
@@ -3321,7 +3361,7 @@ function CreateInfoPaperMarioDialog() {
 function CreateInfoFreeDialog() {
     
     # Create Dialog
-    $global:InfoFreeDialog = CreateDialog -Width 400 -Height 410 -Icon $VIcon
+    $global:InfoFreeDialog = CreateDialog -Width 400 -Height 410 -Icon $Icons.V
     $CloseButton = CreateButton -X ($InfoFreeDialog.Width / 2 - 40) -Y ($InfoFreeDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoFreeDialog
     $CloseButton.Add_Click({$InfoFreeDialog.Hide()})
 
@@ -3370,7 +3410,7 @@ function CreateInfoFreeDialog() {
 function CreateCreditsDialog() {
     
     # Create Dialog
-    $global:CreditsDialog = CreateDialog -Width 760 -Height 450 -Icon $ZeldaIcon3
+    $global:CreditsDialog = CreateDialog -Width 760 -Height 470 -Icon $Icons.Zelda3
     $CloseButton = CreateButton -X ($CreditsDialog.Width / 2 - 40) -Y ($CreditsDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $CreditsDialog
     $CloseButton.Add_Click({$CreditsDialog.Hide()})
 
@@ -3382,35 +3422,35 @@ function CreateCreditsDialog() {
 
 
     # Create the string that will be displayed on the window.
-    $String = '--- Ocarina of Time REDUX ---{0}'
-    $String += '- Maroc, ShadowOne, MattKimura, Roman971, TestRunnerSRL, AmazingAmpharos, Krimtonz, Fig, rlbond86, KevinPal, junglechief{0}'
+    $String = "--- Ocarina of Time REDUX ---{0}"
+    $String += "- Maroc, ShadowOne, MattKimura, Roman971, TestRunnerSRL, AmazingAmpharos, Krimtonz, Fig, rlbond86, KevinPal, junglechief{0}"
 
-    $String += '{0}'
+    $String += "{0}"
     $String += "--- Majora's Mask REDUX ---{0}"
-    $String += '- Maroc, Saneki{0}'
+    $String += "- Maroc, Saneki{0}"
 
-    $String += '{0}'
+    $String += "{0}"
     $String += "--- MM Young Link Model for Ocarina of Time ---{0}"
-    $String += '- slash004, The3Dude{0}'
+    $String += "- slash004, The3Dude{0}"
 
-    $String += '{0}'
+    $String += "{0}"
     $String += "--- MM Adult Link Model for Ocarina of Time ---{0}"
-    $String += '- Skilar (https://youtu.be/x6MIeEZIsPw){0}'
+    $String += "- Skilar (https://youtu.be/x6MIeEZIsPw){0}"
 
-    $String += '{0}'
-    $String += '--- Dawn and Dusk ---{0}'
-    $String += '- Lead Development and Music: Captain Seedy-Eye{0}'
-    $String += '- 64DD Porting: LuigiBlood{0}'
-    $String += '- Special Thanks: PK-LOVE, BWIX, Hylian Modding{0}'
-    $String += '- Testers:  Captain Seedy, LuigiBlood, Hard4Games, ZFG, Dry4Haz, Fig{0}'
+    $String += "{0}"
+    $String += "--- 16:9 Backgrounds for Ocarina of Time ---{0}"
+    $String += "GhostlyDark (Patch), Admentus (Scripting and Assistance){0}"
 
-    $String += '{0}'
-    $String += '--- The Fate of the Bombiwa ---{0}'
-    $String += 'DezZiBao{0}'
+    $String += "{0}"
+    $String += "--- Dawn and Dusk ---{0}"
+    $String += "- Lead Development and Music: Captain Seedy-Eye{0}"
+    $String += "- 64DD Porting: LuigiBlood{0}"
+    $String += "- Special Thanks: PK-LOVE, BWIX, Hylian Modding{0}"
+    $String += "- Testers:  Captain Seedy, LuigiBlood, Hard4Games, ZFG, Dry4Haz, Fig{0}"
 
-    $String += '{0}'
-    $String += "--- Majora's Mask: Masked Quest ---{0}"
-    $String += '- Garo-Mastah, Aroenai, CloudMax, fkualol, VictorHale, Ideka, Saneki{0}'
+    $String += "{0}"
+    $String += "--- The Fate of the Bombiwa ---{0}"
+    $String += "DezZiBao{0}"
 
     #Create Label
     $String = [String]::Format($String, [Environment]::NewLine)
@@ -3419,7 +3459,11 @@ function CreateCreditsDialog() {
 
 
     # Create the string that will be displayed on the window.
-    $String = '--- Translations Ocarina of Time ---{0}'
+    $String = "--- Majora's Mask: Masked Quest ---{0}"
+    $String += "- Garo-Mastah, Aroenai, CloudMax, fkualol, VictorHale, Ideka, Saneki{0}"
+
+    $String += "{0}"
+    $String += '--- Translations Ocarina of Time ---{0}'
     $String += '- Spanish: eduardo_a2j (v2.2){0}'
     $String += '- Polish: RPG (v1.3){0}'
     $String += '- Russian: Zelda64rus (v2.32){0}'
@@ -3444,7 +3488,7 @@ function CreateCreditsDialog() {
 
     $String += '{0}'
     $String += '--- Dolphin ---{0}'
-    $String += '- Admentus (Testing and PowerShell patcher){0}'
+    $String += '- Admentus (Testing and PowerShell Patcher){0}'
     $String += '- Bighead (Initial PowerShell patcher){0}'
     $String += '- GhostlyDark (Testing and Assistance)'
     
@@ -3584,7 +3628,7 @@ function CreateReduxRadioButton([int]$Column, [int]$Row, [Object]$ToolTip, [Obje
 function CreateReduxCheckbox([int]$Column, [int]$Row, [Object]$ToolTip, [Object]$Group, [boolean]$Checked, [string]$Text, [string]$Info) {
     
     $Checkbox = CreateCheckbox -X ($Column * 155 + 15) -Y ($Row * 30 - 10) -Checked $False -IsRadio $False -ToolTip $ToolTip -Info $Info -AddTo $Group
-    CreateLabel -X $CheckBox.Right -Y ($CheckBox.Top + 3) -Width 135 -Height 15 -Text $Text -ToolTip $ToolTip -ToolTipInfo $ToolTipInfo -AddTo $Group
+    CreateLabel -X $CheckBox.Right -Y ($CheckBox.Top + 3) -Width 135 -Height 15 -Text $Text -ToolTip $ToolTip -Info $Info -AddTo $Group
     return $CheckBox
 
 }
@@ -3595,12 +3639,10 @@ function CreateReduxCheckbox([int]$Column, [int]$Row, [Object]$ToolTip, [Object]
 
 # Hide the PowerShell console from the user.
 ShowPowerShellConsole -ShowConsole $False
+[System.GC]::Collect()
 
-# Set paths to all the files stored in the script.
-$global:Files = SetFileParameters
-
-# Create images from Base64 strings.
-CreateImages
+# Find icons
+$global:Icons = SetIconParameters
 
 # Create the dialogs to show to the user.
 CreateMainDialog
