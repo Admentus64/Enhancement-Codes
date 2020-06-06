@@ -450,86 +450,6 @@ function Get-FileName([string]$Path, [string[]]$Description, [string[]]$FileName
 }
 
 
-<#
-#==================================================================================================================================================================================================================================================================
-function CheckMissingFiles() {
-
-    if (!(Test-Path $Icons.OcarinaOfTime -PathType leaf))        { return $False }
-    if (!(Test-Path $Icons.MajorasMask -PathType leaf))          { return $False }
-    if (!(Test-Path $Icons.SuperMario64 -PathType leaf))         { return $False }
-    if (!(Test-Path $Icons.PaperMario -PathType leaf))           { return $False }
-    if (!(Test-Path $Icons.Free -PathType leaf))                 { return $False }
-    if (!(Test-Path $Icons.OcarinaOfTimeRedux -PathType leaf))   { return $False }
-    if (!(Test-Path $Icons.MajorasMaskRedux -PathType leaf))     { return $False }
-    if (!(Test-Path $Icons.CheckGameID -PathType leaf))          { return $False }
-    if (!(Test-Path $Icons.Credits -PathType leaf))              { return $False }
-
-    if (!(Test-Path $Files. -PathType leaf))        { return $False }
-    if (!(Test-Path $Files. -PathType leaf))          { return $False }
-    if (!(Test-Path $Files. -PathType leaf))         { return $False }
-    if (!(Test-Path $Files. -PathType leaf))           { return $False }
-    if (!(Test-Path $Files. -PathType leaf))                 { return $False }
-    if (!(Test-Path $Files. -PathType leaf))   { return $False }
-    if (!(Test-Path $Files. -PathType leaf))     { return $False }
-    if (!(Test-Path $Files. -PathType leaf))          { return $False }
-    if (!(Test-Path $Files. -PathType leaf))              { return $False }
-
-
-
-    $Files.flips                         = $MasterPath + "\Base\flips.exe"
-    $Files.wadpacker                     = $MasterPath + "\Wii VC\wadpacker.exe"
-    $Files.wadunpacker                   = $MasterPath + "\Wii VC\wadunpacker.exe"
-    $Files.wszst                         = $MasterPath + "\Wii VC\wszst.exe"
-    $Files.ckey                          = $MasterPath + "\Wii VC\common-key.bin"
-    $Files.cygcrypto                     = $MasterPath + "\Wii VC\cygcrypto-0.9.8.dll"
-    $Files.cyggccs1                      = $MasterPath + "\Wii VC\cyggcc_s-1.dll"
-    $Files.cygncursesw10                 = $MasterPath + "\Wii VC\cygncursesw-10.dll"
-    $Files.cygpng1616                    = $MasterPath + "\Wii VC\cygpng16-16.dll"
-    $Files.cygwin1                       = $MasterPath + "\Wii VC\cygwin1.dll"
-    $Files.cygz                          = $MasterPath + "\Wii VC\cygz.dll"
-    $Files.ndec                          = $MasterPath + "\Compress\ndec.exe"
-    $Files.TabExt                        = $MasterPath + "\Compress\TabExt.exe"
-    $Files.Compress                      = $MasterPath + "\Compress\Compress.exe"
-    $Files.lzss                          = $MasterPath + "\Wii VC\lzss.exe"
-    $Files.romc                          = $MasterPath + "\Wii VC\romc.exe"
-    $Files.romchu                        = $MasterPath + "\Wii VC\romchu.exe"
-
-    $Files.bpspatch_mm_masked_quest      = $MasterPath + "\Majora's Mask\mm_masked_quest.bps"
-    $Files.bpspatch_mm_pol               = $MasterPath + "\Majora's Mask\mm_pol.bps"
-    $Files.bpspatch_mm_rus               = $MasterPath + "\Majora's Mask\mm_rus.bps"
-    $Files.bpspatch_mm_redux             = $MasterPath + "\Majora's Mask\mm_redux.bps"
-
-    $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\Ocarina of Time\oot_dawn_rev0.bps"
-    $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\Ocarina of Time\oot_dawn_rev1.bps"
-    $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\Ocarina of Time\oot_dawn_rev2.bps"
-    $Files.bpspatch_oot_chi              = $MasterPath + "\Ocarina of Time\oot_chi.bps"
-    $Files.bpspatch_oot_pol              = $MasterPath + "\Ocarina of Time\oot_pol.bps"
-    $Files.bpspatch_oot_spa              = $MasterPath + "\Ocarina of Time\oot_spa.bps"
-    $Files.bpspatch_oot_rus              = $MasterPath + "\Ocarina of Time\oot_rus.bps"
-    $Files.bpspatch_oot_bombiwa          = $MasterPath + "\Ocarina of Time\Decompressed\oot_bombiwa.bps"
-    $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev1_to_rev0.bps"
-    $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev2_to_rev0.bps"
-    $Files.bpspatch_oot_redux            = $MasterPath + "\Ocarina of Time\oot_redux.bps"
-    $Files.bpspatch_oot_models_mm        = $MasterPath + "\Ocarina of Time\Decompressed\oot_models_mm.bps"
-    $Files.bpspatch_oot_widescreen       = $MasterPath + "\Ocarina of Time\Decompressed\oot_widescreen.bps"
-    
-    $Files.bpspatch_pp_hard_mode         = $MasterPath + "\Paper Mario\pp_hard_mode.bps"
-    $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\Paper Mario\pp_hard_mode_plus.bps"
-    $Files.bpspatch_pp_insane_mode       = $MasterPath + "\Paper Mario\pp_insane_mode.bps"
-
-    $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\Super Mario 64\sm64_appFile_01.bps"
-    $Files.bpspatch_sm64_cam             = $MasterPath + "\Super Mario 64\sm64_cam.bps"
-    $Files.bpspatch_sm64_fps             = $MasterPath + "\Super Mario 64\sm64_fps.bps"
-    $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\Super Mario 64\sm64_multiplayer.bps"
-
-
-
-
-    return $True
-
-}
-#>
-
 
 #==================================================================================================================================================================================================================================================================
 function SetIconParameters() {
@@ -549,7 +469,7 @@ function SetIconParameters() {
     $Icons.OcarinaOfTimeRedux   = $IconsPath + "\Ocarina of Time REDUX.ico"
     $Icons.MajorasMaskRedux     = $IconsPath + "\Majora's Mask REDUX.ico"
 
-    $Icons.CheckGameID          = $IconsPath + "\CheckGameID.ico"
+    $Icons.CheckGameID          = $IconsPath + "\Check GameID.ico"
     $Icons.Credits              = $IconsPath + "\Credits.ico"
 
     $Icons.GetEnumerator() | ForEach-Object {
