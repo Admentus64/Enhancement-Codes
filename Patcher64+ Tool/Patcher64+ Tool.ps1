@@ -19,7 +19,7 @@ Add-Type -AssemblyName 'System.Drawing'
 #==============================================================================================================================================================================================
 # Setup global variables
 
-$global:Version = "05-06-2020"
+$global:Version = "06-06-2020"
 
 $global:GameID = ""
 $global:ChannelTitle = ""
@@ -32,6 +32,7 @@ $global:IsWiiVC = $True
 $global:IsDowngrade = $False
 $global:PatchedFileName = ""
 $global:CheckHashSum = ""
+$global:MissingFiles = $False
 $global:CurrentModeFont = [System.Drawing.Font]::new("Microsoft Sans Serif", 12, [System.Drawing.FontStyle]::Bold)
 $global:VCPatchFont = [System.Drawing.Font]::new("Microsoft Sans Serif", 8, [System.Drawing.FontStyle]::Bold)
 
@@ -68,7 +69,7 @@ if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
     $BasePath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 }
 else {
-  $ThisPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+  $BasePath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
   if (!$BasePath) { $BasePath = "." }
 }
 
@@ -160,14 +161,14 @@ function MainFunctionReset([string]$Command, [string]$Hash, [boolean]$Compress) 
     $global:PatchedFileName = "_patched"
     $global:CheckHashSum = $Hash
 
-    if (!$IsWiiVC)                                                                  { $global:Z64File = SetZ64Parameters -Z64Path $GameZ64 }
-    if (!(CheckCheckBox -CheckBox $InputCustomGameIDCheckbox))                      { ChangeGameMode -Mode $GameType }
+    if (!$global:IsWiiVC)                                               { $global:Z64File = SetZ64Parameters -Z64Path $global:GameZ64 }
+    if (!(CheckCheckBox -CheckBox $global:InputCustomGameIDCheckbox))   { ChangeGameMode -Mode $global:GameType }
 
-    if ($IsWiiVC -and $GetCommand -eq "Downgrade" -and $PatchVCDowngrade.Visible) {
-        $PatchVCDowngrade.Checked = $True
+    if ($global:IsWiiVC -and $global:GetCommand -eq "Downgrade" -and $global:PatchVCDowngrade.Visible) {
+        $global:PatchVCDowngrade.Checked = $True
         $global:IsDowngrade = $True
     }
-    elseif ($IsWiiVC -and $GetCommand -eq "No Downgrade") { $PatchVCDowngrade.Checked = $False }
+    elseif ($global:IsWiiVC -and $global:GetCommand -eq "No Downgrade") { $global:PatchVCDowngrade.Checked = $False }
 
     SetROMFile
 
@@ -180,18 +181,15 @@ function MainFunctionOoTRedux([string]$Command, [string]$Hash, [boolean]$Compres
     
     MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
 
-    $GameID = "NAC0"
-    $ChannelTitle = "Redux: Ocarina"
-    $PatchedFileName = '_redux_patched'
-    $IsRedux = $true
+    $global:GameID = "NAC0"
+    $global:ChannelTitle = "Redux: Ocarina"
+    $global:PatchedFileName = '_redux_patched'
+    $global:IsRedux = $true
 
-    # Set paths to all the files stored in the script.
-    $global:Files = SetFileParameters
-
-    $PatchVCExpandMemory.Checked = $true
-    $PatchVCRemapDPad.Checked = $true
-    if ($IsWiiVC -and !$PatchVCRemapCDown.Checked -and !$PatchVCRemapZ.Checked)   { $PatchVCLeaveDPadUp.Checked = $true }
-    if ($IncludeReduxOoT.Checked)                                                 { $global:PatchFile = $Files.bpspatch_oot_redux }
+    $global:PatchVCExpandMemory.Checked = $true
+    $global:PatchVCRemapDPad.Checked = $true
+    if ($global:IsWiiVC -and !$global:PatchVCRemapCDown.Checked -and !$global:PatchVCRemapZ.Checked)   { $global:PatchVCLeaveDPadUp.Checked = $true }
+    if ($global:IncludeReduxOoT.Checked)                                                               { $global:PatchFile = $Files.bpspatch_oot_redux }
     else { $global:PatchFile = $null }
     
     MainFunction
@@ -205,17 +203,14 @@ function MainFunctionMMRedux([string]$Command, [string]$Hash, [boolean]$Compress
     
     MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
 
-    $GameID = "NAR0"
-    $ChannelTitle = "Redux: Majora's"
-    $PatchedFileName = '_redux_patched'
-    $IsRedux = $true
-
-    # Set paths to all the files stored in the script.
-    $global:Files = SetFileParameters
+    $global:GameID = "NAR0"
+    $global:ChannelTitle = "Redux: Majora's"
+    $global:PatchedFileName = '_redux_patched'
+    $global:IsRedux = $true
 
     if ($IncludeReduxMM.Checked) { $global:PatchFile = $Files.bpspatch_mm_redux }
     else { $global:PatchFile = $null }
-    $PatchVCRemapDPad.Checked = $true
+    $global:PatchVCRemapDPad.Checked = $true
 
     MainFunction
 
@@ -226,7 +221,7 @@ function MainFunctionMMRedux([string]$Command, [string]$Hash, [boolean]$Compress
 #==============================================================================================================================================================================================
 function MainFunctionPatchRemap([String]$Command, [string]$Id, [string]$Title, [string]$Patch, [string]$PatchedFile, [string]$Hash, [Boolean]$Compress) {
     
-    $PatchVCRemapDPad.Checked = $true
+    $global:PatchVCRemapDPad.Checked = $true
     MainFunctionPatch -Command $Command -Id $Id -Title $Title -Patch $Patch -PatchedFile $PatchedFile -Hash $Hash -Compress $Compress
 
 }
@@ -237,14 +232,11 @@ function MainFunctionPatchRemap([String]$Command, [string]$Id, [string]$Title, [
 function MainFunctionPatch([String]$Command, [string]$Id, [string]$Title, [string]$Patch, [string]$PatchedFile, [string]$Hash, [Boolean]$Compress) {
     
     MainFunctionReset -Command $Command -Hash $Hash -Compress $Compress
-    
-    # Set paths to all the files stored in the script.
-    $global:Files = SetFileParameters
 
-    if ($GameID -ne $null)         { $global:GameID = $Id }
-    if ($ChannelTitle -ne $null)   { $global:ChannelTitle = $Title }
+    if ($global:GameID -ne $null)         { $global:GameID = $Id }
+    if ($global:ChannelTitle -ne $null)   { $global:ChannelTitle = $Title }
     $global:PatchFile = $Patch
-    $PatchedFileName = $PatchedFile
+    $global:PatchedFileName = $PatchedFile
 
     MainFunction
 
@@ -371,15 +363,11 @@ function Cleanup() {
         DeleteFile -File ($WiiVCPath + "\" + $WADFile.FolderName + ".trailer")
     }
 
-    if ($IsCompress) {
-        DeleteFile -File "dmaTable.dat"
-        DeleteFile -File "ARCHIVE.bin"
-    }
+    DeleteFile -File $Files.dmaTable
+    DeleteFile -File $Files.archive
 
     $MainDialog.Enabled = $True
-
-    if ($Files -ne $Null) { $global:Files = $Null }
-    [System.GC]::Collect()
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -462,6 +450,86 @@ function Get-FileName([string]$Path, [string[]]$Description, [string[]]$FileName
 }
 
 
+<#
+#==================================================================================================================================================================================================================================================================
+function CheckMissingFiles() {
+
+    if (!(Test-Path $Icons.OcarinaOfTime -PathType leaf))        { return $False }
+    if (!(Test-Path $Icons.MajorasMask -PathType leaf))          { return $False }
+    if (!(Test-Path $Icons.SuperMario64 -PathType leaf))         { return $False }
+    if (!(Test-Path $Icons.PaperMario -PathType leaf))           { return $False }
+    if (!(Test-Path $Icons.Free -PathType leaf))                 { return $False }
+    if (!(Test-Path $Icons.OcarinaOfTimeRedux -PathType leaf))   { return $False }
+    if (!(Test-Path $Icons.MajorasMaskRedux -PathType leaf))     { return $False }
+    if (!(Test-Path $Icons.CheckGameID -PathType leaf))          { return $False }
+    if (!(Test-Path $Icons.Credits -PathType leaf))              { return $False }
+
+    if (!(Test-Path $Files. -PathType leaf))        { return $False }
+    if (!(Test-Path $Files. -PathType leaf))          { return $False }
+    if (!(Test-Path $Files. -PathType leaf))         { return $False }
+    if (!(Test-Path $Files. -PathType leaf))           { return $False }
+    if (!(Test-Path $Files. -PathType leaf))                 { return $False }
+    if (!(Test-Path $Files. -PathType leaf))   { return $False }
+    if (!(Test-Path $Files. -PathType leaf))     { return $False }
+    if (!(Test-Path $Files. -PathType leaf))          { return $False }
+    if (!(Test-Path $Files. -PathType leaf))              { return $False }
+
+
+
+    $Files.flips                         = $MasterPath + "\Base\flips.exe"
+    $Files.wadpacker                     = $MasterPath + "\Wii VC\wadpacker.exe"
+    $Files.wadunpacker                   = $MasterPath + "\Wii VC\wadunpacker.exe"
+    $Files.wszst                         = $MasterPath + "\Wii VC\wszst.exe"
+    $Files.ckey                          = $MasterPath + "\Wii VC\common-key.bin"
+    $Files.cygcrypto                     = $MasterPath + "\Wii VC\cygcrypto-0.9.8.dll"
+    $Files.cyggccs1                      = $MasterPath + "\Wii VC\cyggcc_s-1.dll"
+    $Files.cygncursesw10                 = $MasterPath + "\Wii VC\cygncursesw-10.dll"
+    $Files.cygpng1616                    = $MasterPath + "\Wii VC\cygpng16-16.dll"
+    $Files.cygwin1                       = $MasterPath + "\Wii VC\cygwin1.dll"
+    $Files.cygz                          = $MasterPath + "\Wii VC\cygz.dll"
+    $Files.ndec                          = $MasterPath + "\Compress\ndec.exe"
+    $Files.TabExt                        = $MasterPath + "\Compress\TabExt.exe"
+    $Files.Compress                      = $MasterPath + "\Compress\Compress.exe"
+    $Files.lzss                          = $MasterPath + "\Wii VC\lzss.exe"
+    $Files.romc                          = $MasterPath + "\Wii VC\romc.exe"
+    $Files.romchu                        = $MasterPath + "\Wii VC\romchu.exe"
+
+    $Files.bpspatch_mm_masked_quest      = $MasterPath + "\Majora's Mask\mm_masked_quest.bps"
+    $Files.bpspatch_mm_pol               = $MasterPath + "\Majora's Mask\mm_pol.bps"
+    $Files.bpspatch_mm_rus               = $MasterPath + "\Majora's Mask\mm_rus.bps"
+    $Files.bpspatch_mm_redux             = $MasterPath + "\Majora's Mask\mm_redux.bps"
+
+    $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\Ocarina of Time\oot_dawn_rev0.bps"
+    $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\Ocarina of Time\oot_dawn_rev1.bps"
+    $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\Ocarina of Time\oot_dawn_rev2.bps"
+    $Files.bpspatch_oot_chi              = $MasterPath + "\Ocarina of Time\oot_chi.bps"
+    $Files.bpspatch_oot_pol              = $MasterPath + "\Ocarina of Time\oot_pol.bps"
+    $Files.bpspatch_oot_spa              = $MasterPath + "\Ocarina of Time\oot_spa.bps"
+    $Files.bpspatch_oot_rus              = $MasterPath + "\Ocarina of Time\oot_rus.bps"
+    $Files.bpspatch_oot_bombiwa          = $MasterPath + "\Ocarina of Time\Decompressed\oot_bombiwa.bps"
+    $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev1_to_rev0.bps"
+    $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev2_to_rev0.bps"
+    $Files.bpspatch_oot_redux            = $MasterPath + "\Ocarina of Time\oot_redux.bps"
+    $Files.bpspatch_oot_models_mm        = $MasterPath + "\Ocarina of Time\Decompressed\oot_models_mm.bps"
+    $Files.bpspatch_oot_widescreen       = $MasterPath + "\Ocarina of Time\Decompressed\oot_widescreen.bps"
+    
+    $Files.bpspatch_pp_hard_mode         = $MasterPath + "\Paper Mario\pp_hard_mode.bps"
+    $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\Paper Mario\pp_hard_mode_plus.bps"
+    $Files.bpspatch_pp_insane_mode       = $MasterPath + "\Paper Mario\pp_insane_mode.bps"
+
+    $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\Super Mario 64\sm64_appFile_01.bps"
+    $Files.bpspatch_sm64_cam             = $MasterPath + "\Super Mario 64\sm64_cam.bps"
+    $Files.bpspatch_sm64_fps             = $MasterPath + "\Super Mario 64\sm64_fps.bps"
+    $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\Super Mario 64\sm64_multiplayer.bps"
+
+
+
+
+    return $True
+
+}
+#>
+
 
 #==================================================================================================================================================================================================================================================================
 function SetIconParameters() {
@@ -470,14 +538,25 @@ function SetIconParameters() {
     $Icons = @{}
 
     # Store all files by their name.
-    $Icons.V        = $IconsPath + "\V.ico"
+    $Icons.Main                 = $IconsPath + "\Main.ico"
 
-    $Icons.Mario1   = $IconsPath + "\Mario1.ico"
-    $Icons.Mario2   = $IconsPath + "\Mario2.ico"
+    $Icons.OcarinaOfTime        = $IconsPath + "\Ocarina of Time.ico"
+    $Icons.MajorasMask          = $IconsPath + "\Majora's Mask.ico"
+    $Icons.SuperMario64         = $IconsPath + "\Super Mario 64.ico"
+    $Icons.PaperMario           = $IconsPath + "\Paper Mario.ico"
+    $Icons.Free                 = $IconsPath + "\Free.ico"
 
-    $Icons.Zelda1   = $IconsPath + "\Zelda1.ico"
-    $Icons.Zelda2   = $IconsPath + "\Zelda2.ico"
-    $Icons.Zelda3   = $IconsPath + "\Zelda3.ico"
+    $Icons.OcarinaOfTimeRedux   = $IconsPath + "\Ocarina of Time REDUX.ico"
+    $Icons.MajorasMaskRedux     = $IconsPath + "\Majora's Mask REDUX.ico"
+
+    $Icons.CheckGameID          = $IconsPath + "\CheckGameID.ico"
+    $Icons.Credits              = $IconsPath + "\Credits.ico"
+
+    $Icons.GetEnumerator() | ForEach-Object {
+        if (!(Test-Path $_.value -PathType leaf)) {
+            $global:MissingFiles = $True
+        }
+    }
 
     return $Icons
 
@@ -492,87 +571,60 @@ function SetFileParameters() {
     $Files = @{}
 
     # Store all files by their name.
-    $Files.flips                             = $MasterPath + "\Base\flips.exe"
+    $Files.flips                         = $MasterPath + "\Base\flips.exe"
+    $Files.wadpacker                     = $MasterPath + "\Wii VC\wadpacker.exe"
+    $Files.wadunpacker                   = $MasterPath + "\Wii VC\wadunpacker.exe"
+    $Files.wszst                         = $MasterPath + "\Wii VC\wszst.exe"
+    $Files.cygcrypto                     = $MasterPath + "\Wii VC\cygcrypto-0.9.8.dll"
+    $Files.cyggccs1                      = $MasterPath + "\Wii VC\cyggcc_s-1.dll"
+    $Files.cygncursesw10                 = $MasterPath + "\Wii VC\cygncursesw-10.dll"
+    $Files.cygpng1616                    = $MasterPath + "\Wii VC\cygpng16-16.dll"
+    $Files.cygwin1                       = $MasterPath + "\Wii VC\cygwin1.dll"
+    $Files.cygz                          = $MasterPath + "\Wii VC\cygz.dll"
+    $Files.ndec                          = $MasterPath + "\Compress\ndec.exe"
+    $Files.TabExt                        = $MasterPath + "\Compress\TabExt.exe"
+    $Files.Compress                      = $MasterPath + "\Compress\Compress.exe"
+    $Files.lzss                          = $MasterPath + "\Wii VC\lzss.exe"
+    $Files.romc                          = $MasterPath + "\Wii VC\romc.exe"
+    $Files.romchu                        = $MasterPath + "\Wii VC\romchu.exe"
+
+    $Files.bpspatch_mm_masked_quest      = $MasterPath + "\Majora's Mask\mm_masked_quest.bps"
+    $Files.bpspatch_mm_pol               = $MasterPath + "\Majora's Mask\mm_pol.bps"
+    $Files.bpspatch_mm_rus               = $MasterPath + "\Majora's Mask\mm_rus.bps"
+    $Files.bpspatch_mm_redux             = $MasterPath + "\Majora's Mask\mm_redux.bps"
+
+    $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\Ocarina of Time\oot_dawn_rev0.bps"
+    $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\Ocarina of Time\oot_dawn_rev1.bps"
+    $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\Ocarina of Time\oot_dawn_rev2.bps"
+    $Files.bpspatch_oot_chi              = $MasterPath + "\Ocarina of Time\oot_chi.bps"
+    $Files.bpspatch_oot_pol              = $MasterPath + "\Ocarina of Time\oot_pol.bps"
+    $Files.bpspatch_oot_spa              = $MasterPath + "\Ocarina of Time\oot_spa.bps"
+    $Files.bpspatch_oot_rus              = $MasterPath + "\Ocarina of Time\oot_rus.bps"
+    $Files.bpspatch_oot_bombiwa          = $MasterPath + "\Ocarina of Time\Decompressed\oot_bombiwa.bps"
+    $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev1_to_rev0.bps"
+    $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev2_to_rev0.bps"
+    $Files.bpspatch_oot_redux            = $MasterPath + "\Ocarina of Time\oot_redux.bps"
+    $Files.bpspatch_oot_models_mm        = $MasterPath + "\Ocarina of Time\Decompressed\oot_models_mm.bps"
+    $Files.bpspatch_oot_widescreen       = $MasterPath + "\Ocarina of Time\Decompressed\oot_widescreen.bps"
     
-    if ($IsWiiVC) {
-        $Files.wadpacker                     = $MasterPath + "\Wii VC\wadpacker.exe"
-        $Files.wadunpacker                   = $MasterPath + "\Wii VC\wadunpacker.exe"
-        $Files.wszst                         = $MasterPath + "\Wii VC\wszst.exe"
-        $Files.ckey                          = $MasterPath + "\Wii VC\common-key.bin"
-    
-        $Files.cygcrypto                     = $MasterPath + "\Wii VC\cygcrypto-0.9.8.dll"
-        $Files.cyggccs1                      = $MasterPath + "\Wii VC\cyggcc_s-1.dll"
-        $Files.cygncursesw10                 = $MasterPath + "\Wii VC\cygncursesw-10.dll"
-        $Files.cygpng1616                    = $MasterPath + "\Wii VC\cygpng16-16.dll"
-        $Files.cygwin1                       = $MasterPath + "\Wii VC\cygwin1.dll"
-        $Files.cygz                          = $MasterPath + "\Wii VC\cygz.dll"
-    }
-    
-    if ($IsCompress) {
-        $Files.ndec                          = $MasterPath + "\Compress\ndec.exe"
-        $Files.TabExt                        = $MasterPath + "\Compress\TabExt.exe"
-        $Files.Compress                      = $MasterPath + "\Compress\Compress.exe"
+    $Files.bpspatch_pp_hard_mode         = $MasterPath + "\Paper Mario\pp_hard_mode.bps"
+    $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\Paper Mario\pp_hard_mode_plus.bps"
+    $Files.bpspatch_pp_insane_mode       = $MasterPath + "\Paper Mario\pp_insane_mode.bps"
+
+    $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\Super Mario 64\sm64_appFile_01.bps"
+    $Files.bpspatch_sm64_cam             = $MasterPath + "\Super Mario 64\sm64_cam.bps"
+    $Files.bpspatch_sm64_fps             = $MasterPath + "\Super Mario 64\sm64_fps.bps"
+    $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\Super Mario 64\sm64_multiplayer.bps"
+
+    $Files.GetEnumerator() | ForEach-Object {
+        if (!(Test-Path $_.value -PathType leaf)) {
+            $global:MissingFiles = $True
+        }
     }
 
-    if ($GameType -eq "Majora's Mask") {
-        $Files.lzss                          = $MasterPath + "\Wii VC\lzss.exe"
-        $Files.romchu                        = $MasterPath + "\Wii VC\romchu.exe"
-    }
-
-    if ($GameType -eq "Majora's Mask" -and !$IsCompress) {
-        $Files.bpspatch_mm_masked_quest      = $MasterPath + "\Majora's Mask\mm_masked_quest.bps"
-        $Files.bpspatch_mm_rus               = $MasterPath + "\Majora's Mask\mm_rus.bps"
-        
-    }
-
-    if ($GameType -eq "Majora's Mask" -and $IsCompress) {
-        $Files.bpspatch_mm_pol               = $MasterPath + "\Majora's Mask\mm_pol.bps"
-    }
-
-    if ($GameType -eq "Majora's Mask" -and $IsRedux) {
-        $Files.bpspatch_mm_redux             = $MasterPath + "\Majora's Mask\mm_redux.bps"
-    }
-
-    if ($GameType -eq "Ocarina of Time" -and !$IsCompress) {
-        $Files.bpspatch_oot_dawn_rev0        = $MasterPath + "\Ocarina of Time\oot_dawn_rev0.bps"
-        $Files.bpspatch_oot_dawn_rev1        = $MasterPath + "\Ocarina of Time\oot_dawn_rev1.bps"
-        $Files.bpspatch_oot_dawn_rev2        = $MasterPath + "\Ocarina of Time\oot_dawn_rev2.bps"
-        $Files.bpspatch_oot_rus              = $MasterPath + "\Ocarina of Time\oot_rus.bps"
-        
-    }
-
-    if ($GameType -eq "Ocarina of Time" -and $IsCompress) {
-        $Files.bpspatch_oot_bombiwa          = $MasterPath + "\Ocarina of Time\oot_bombiwa.bps"
-        $Files.bpspatch_oot_chi              = $MasterPath + "\Ocarina of Time\oot_chi.bps"
-        $Files.bpspatch_oot_pol              = $MasterPath + "\Ocarina of Time\oot_pol.bps"
-        $Files.bpspatch_oot_spa              = $MasterPath + "\Ocarina of Time\oot_spa.bps"
-    }
-
-    if ($GameType -eq "Ocarina of Time" -and $IsDowngrade) {
-        $Files.bpspatch_oot_rev1_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev1_to_rev0.bps"
-        $Files.bpspatch_oot_rev2_to_rev0     = $MasterPath + "\Ocarina of Time\oot_rev2_to_rev0.bps"
-    }
-
-    if ($GameType -eq "Ocarina of Time" -and $IsRedux) {
-        $Files.bpspatch_oot_redux            = $MasterPath + "\Ocarina of Time\oot_redux.bps"
-        $Files.bpspatch_oot_models_mm        = $MasterPath + "\Ocarina of Time\oot_models_mm.bps"
-        $Files.bpspatch_oot_widescreen       = $MasterPath + "\Ocarina of Time\oot_widescreen.bps"
-    }
-    
-    if ($GameType -eq "Paper Mario") {
-        $Files.romc                          = $MasterPath + "\Wii VC\romc.exe"
-
-        $Files.bpspatch_pp_hard_mode         = $MasterPath + "\Paper Mario\pp_hard_mode.bps"
-        $Files.bpspatch_pp_hard_mode_plus    = $MasterPath + "\Paper Mario\pp_hard_mode_plus.bps"
-        $Files.bpspatch_pp_insane_mode       = $MasterPath + "\Paper Mario\pp_insane_mode.bps"
-    }
-
-    if ($GameType -eq "Super Mario 64") {
-        $Files.bpspatch_sm64_appFile_01      = $MasterPath + "\Super Mario 64\sm64_appFile_01.bps"
-        $Files.bpspatch_sm64_cam             = $MasterPath + "\Super Mario 64\sm64_cam.bps"
-        $Files.bpspatch_sm64_fps             = $MasterPath + "\Super Mario 64\sm64_fps.bps"
-        $Files.bpspatch_sm64_multiplayer     = $MasterPath + "\Super Mario 64\sm64_multiplayer.bps"
-    }
+    $Files.ckey                          = $MasterPath + "\Wii VC\common-key.bin"
+    $Files.dmaTable                      = $BasePath + "\dmaTable.dat"
+    $Files.archive                       = $BasePath + "\ARCHIVE.bin"
 
     # Set it to a global value.
     return $Files
@@ -592,8 +644,7 @@ function SetWADParameters([string]$WADPath, [string]$FolderName) {
     
     # Store some stuff about the WAD that I'll probably reference.
     $WADFile.Name         = $WADItem.BaseName
-    $WADFile.Path         = $WADItem.DirectoryName
-    $WADFile.Folder       = $WADFile.Path + '\' + $FolderName
+    $WADFile.Folder       = $WiiVCPath + '\' + $FolderName
     $WADFile.FolderName   = $FolderName
 
     $WADFile.AppFile00    = $WADFile.Folder + '\00000000.app'
@@ -608,10 +659,10 @@ function SetWADParameters([string]$WADPath, [string]$FolderName) {
     $WADFile.tmd          = $WADFile.Folder + '\' + $FolderName + '.tmd'
     $WADFile.trailer      = $WADFile.Folder + '\' + $FolderName + '.trailer'
     
-    if ($gameType -eq "Majora's Mask" -or $gameType -eq "Paper Mario")   { $WADFile.ROMFile = $WADFile.AppPath05 + '\romc' }
+    if ($GameType -eq "Majora's Mask" -or $GameType -eq "Paper Mario")   { $WADFile.ROMFile = $WADFile.AppPath05 + '\romc' }
     else                                                                 { $WADFile.ROMFile = $WADFile.AppPath05 + '\rom' }
-    $WADFile.Patched      = $WADFile.Path + '\' + $WADFile.Name + $PatchedFileName + '.wad'
-    $WADFile.Extracted    = $WADFile.Path + '\' + $WADFile.Name + "_extracted_rom" + '.z64'
+    $WADFile.Patched      = $WADItem.DirectoryName + '\' + $WADFile.Name + $PatchedFileName + '.wad'
+    $WADFile.Extracted    = $WADItem.DirectoryName + '\' + $WADFile.Name + "_extracted_rom" + '.z64'
 
     SetROMFile
 
@@ -674,11 +725,13 @@ function ExtractWADFile() {
 
     # We need to be in the same path as some files so just jump there.
     Push-Location $WiiVCPath
-
+    
+    $ByteArray = $null
     if (!(Test-Path $Files.ckey -PathType Leaf)) {
         $ByteArray = @(235, 228, 42, 34, 94, 133, 147, 228, 72, 217, 197, 69, 115, 129, 170, 247)
         [io.file]::WriteAllBytes($Files.ckey, $ByteArray) | Out-Null
     }
+    $ByteArray = $null
     
     # Run the program to extract the wad file.
     $ErrorActionPreference = 'SilentlyContinue'
@@ -694,15 +747,17 @@ function ExtractWADFile() {
             $global:WADFile = SetWADParameters -WADPath $GameWAD -FolderName $Folder.Name
 
             # If it already exists remove it first. Helps me with testing this out.
-            if (TestPath -LiteralPath $WADFile.Folder) { RemovePath -LiteralPath $WADFile.Folder }
+            #if (TestPath -LiteralPath $WADFile.Folder) { RemovePath -LiteralPath $WADFile.Folder }
 
             # Move this folder to where the WAD file is located.
-            Move-Item -LiteralPath $Folder.FullName -Destination $WADFile.Path -Force
+            #Move-Item -LiteralPath $Folder.FullName -Destination $WADFile.Path -Force
         }
     }
 
     # Doesn't matter, but return to where we were.
     Pop-Location
+
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -715,12 +770,14 @@ function ExtractU8AppFile() {
     UpdateStatusLabelDuringPatching -Text 'Extracting "00000005.app" file...'
     
     # Unpack the file using wszst.
-    & $Files.wszst 'X' $WADFile.AppFile05 '-d' $WADFile.AppPath05
+    & $Files.wszst 'X' $WADFile.AppFile05 '-d' $WADFile.AppPath05 | Out-Null
 
     # Remove all .T64 files when selected
     if ($PatchVCRemoveT64.Checked) {
         Get-ChildItem $WADFile.AppPath05 -Include *.T64 -Recurse | Remove-Item
     }
+
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -733,6 +790,8 @@ function PatchVCEmulator() {
 
     # Set the status label.
     UpdateStatusLabelDuringPatching -Text ('Patching ' + $GameType + ' VC Emulator...')
+
+    $ByteArray = $null
 
     if ($GameType -eq "Ocarina of Time") {
         
@@ -841,6 +900,9 @@ function PatchVCEmulator() {
 
     }
 
+    $ByteArray = $null
+    [System.GC]::Collect() | Out-Null
+
 }
 
 
@@ -862,23 +924,37 @@ function PatchVCROM() {
             Move-Item $ROMFile -Destination $WADFile.Extracted
             UpdateStatusLabelDuringPatching -Text ("Successfully extracted " + $GameType + " ROM.")
         }
-        else                                   { UpdateStatusLabelDuringPatching -Text ("Could not extract " + $GameType + " ROM. Is it a Majora's Mask or Paper Mario ROM?") }
+        else { UpdateStatusLabelDuringPatching -Text ("Could not extract " + $GameType + " ROM. Is it a Majora's Mask or Paper Mario ROM?") }
 
         return $False
     }
 
     # Replace ROM if needed
     if ($GetCommand -eq "Inject") {
-        Remove-Item $ROMFile
-        Copy-Item $Z64FilePath -Destination $ROMFile
+        if (Test-Path $ROMFile -PathType leaf) {
+            Remove-Item $ROMFile
+            Copy-Item $Z64FilePath -Destination $ROMFile
+        }
+        else {
+            UpdateStatusLabelDuringPatching -Text ("Could not inject " + $GameType + " ROM. Is it a Majora's Mask or Paper Mario ROM?")
+            return $False
+        }
     }
 
     # Decompress romc if needed
     if ($GetCommand -ne "Inject" -and ($GameType -eq "Majora's Mask" -or $GameType -eq "Paper Mario") ) {  
-        if ($GameType -eq "Majora's Mask")     { & $Files.romchu $ROMFile $ROMCFile | Out-Host }
-        elseif ($GameType -eq "Paper Mario")   { & $Files.romc d $ROMFile $ROMCFile | Out-Host }
-        Remove-Item $ROMFile
-        Rename-Item -Path $ROMCFile -NewName "romc"
+
+        if (Test-Path $ROMFile -PathType leaf) {
+            if ($GameType -eq "Majora's Mask")     { & $Files.romchu $ROMFile $ROMCFile | Out-Null }
+            elseif ($GameType -eq "Paper Mario")   { & $Files.romc d $ROMFile $ROMCFile | Out-Null }
+            Remove-Item $ROMFile
+            Rename-Item -Path $ROMCFile -NewName "romc"
+        }
+        else {
+            UpdateStatusLabelDuringPatching -Text ("Could not decompress " + $GameType + " ROM. Is it a Majora's Mask or Paper Mario ROM?")
+            return $False
+        }
+
     }
 
     # Get the file as a byte array so the size can be analyzed.
@@ -889,6 +965,9 @@ function PatchVCROM() {
     
     # Fill the entire array with junk data. The patched ROM is slightly smaller than 8MB but we need an 8MB ROM.
     for ($i=0; $i-lt $ByteArray.Length; $i++) { $NewByteArray[$i] = 255 }
+
+    $ByteArray = $null
+    [System.GC]::Collect() | Out-Null
 
     return $True
 
@@ -913,6 +992,9 @@ function DowngradeROM() {
         if ($HashSum -eq $HashSum_oot_rev1) { & $Files.flips $Files.bpspatch_oot_rev1_to_rev0 $ROMFile | Out-Host }
         elseif ($HashSum -eq $HashSum_oot_rev2) { & $Files.flips $Files.bpspatch_oot_rev2_to_rev0 $ROMFile | Out-Host }
         $global:CheckHashSum = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash
+
+        $HashSum = $null
+        [System.GC]::Collect() | Out-Null
 
     }
 
@@ -945,23 +1027,12 @@ function CompareHashSums() {
             return $False
         }
 
+        $HashSum = $Null
+        [System.GC]::Collect() | Out-Null
+
     }
 
     return $True
-
-}
-
-
-
-#==============================================================================================================================================================================================
-function DecompressROM() {
-
-    if (!$IsCompress -or $GetCommand -eq "Inject" -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
-    
-    & $Files.TabExt $ROMFile | Out-Host
-    & $Files.ndec $ROMFile $DecompressedROMFile | Out-Host
-
-    if ($IsWiiVC) { Remove-Item $ROMFile }
 
 }
 
@@ -977,15 +1048,13 @@ function PatchROM([string]$Hash) {
 
     $HashSum1 = $null
     if ($IsWiiVC -and $GetCommand -eq "BPS Patch") { $HashSum1 = (Get-FileHash -Algorithm SHA256 $ROMFile).Hash }
-    
+
     # Apply the selected patch to the ROM, if it is provided
     if ($PatchFile -ne $null) {
         if ($IsWiiVC -and $IsCompress)         { & $Files.flips $PatchFile $DecompressedROMFile | Out-Host }
         elseif ($IsWiiVC -and !$IsCompress)    { & $Files.flips $PatchFile $PatchedROMFile | Out-Host }
         elseif (!$IsWiiVC -and $IsCompress)    { & $Files.flips $PatchFile $DecompressedROMFile | Out-Host }
-        elseif (!$IsWiiVC -and !$IsCompress)   { 
-        & $Files.flips --apply $PatchFile $ROMFile $PatchedROMFile | Out-Host 
-        }
+        elseif (!$IsWiiVC -and !$IsCompress)   { & $Files.flips --apply $PatchFile $ROMFile $PatchedROMFile | Out-Host }
     }
 
     if ($IsWiiVC -and $GetCommand -eq "BPS Patch") {
@@ -1005,12 +1074,28 @@ function PatchROM([string]$Hash) {
 
 
 #==============================================================================================================================================================================================
+function DecompressROM() {
+
+    if (!$IsCompress -or $GetCommand -eq "Inject" -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
+    
+    & $Files.TabExt $ROMFile | Out-Host
+    & $Files.ndec $ROMFile $DecompressedROMFile | Out-Host
+
+    if ($IsWiiVC) { Remove-Item $ROMFile }
+    [System.GC]::Collect() | Out-Null
+
+}
+
+
+
+#==============================================================================================================================================================================================
 function CompressROM() {
     
     if (!$IsCompress -or $GetCommand -eq "Inject" -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
 
-    & $Files.Compress $DecompressedROMFile $PatchedROMFile
+    & $Files.Compress $DecompressedROMFile $PatchedROMFile | Out-Null
     Remove-Item $DecompressedROMFile
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -1018,12 +1103,13 @@ function CompressROM() {
 
 #==============================================================================================================================================================================================
 function CompressROMC() {
+    
+    if ($GameType -ne "Paper Mario") { return }
 
-    if ($GetCommand -ne "Inject" -and $GameType -eq "Paper Mario") {
-        & $Files.romc e $ROMFile $ROMCFile | Out-Host
-        Remove-Item $ROMFile
-        Rename-Item -Path $ROMCFile -NewName "romc"
-    }
+    & $Files.romc e $ROMFile $ROMCFile | Out-Null
+    Remove-Item $ROMFile
+    Rename-Item -Path $ROMCFile -NewName "romc"
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -1033,9 +1119,15 @@ function CompressROMC() {
 function PatchRedux() {
     
     # SETUP #
-    if (!$IsRedux -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
+    if (!(CheckReduxOptions) -or !$IsRedux -or ($GameType -ne "Ocarina of Time" -and $GameType -ne "Majora's Mask")) { return }
     UpdateStatusLabelDuringPatching -Text ("Patching " + $GameType + " REDUX...")
 
+    # RUN DECOMPRESS #
+    if (!$IsCompress) {
+        $global:IsCompress = $True
+        DecompressROM
+    }
+    
     # NEW DMATABLE #
     $offsets = ""
     if ($GameType -eq "Ocarina of Time") {
@@ -1047,13 +1139,14 @@ function PatchRedux() {
         $offsets += "1545 1546 1547 1548 1549 1550 -1551 1552 1553 1554 1555 1556 1557 1558 1559 1560 1561 1562 1563 1564 1565 1566 1567" 
     }
     
-    if (Test-Path dmaTable.dat -PathType leaf) { Remove-Item dmaTable.dat }
-    Add-Content dmaTable.dat $offsets
+    DeleteFile -File $Files.dmaTable
+    Add-Content $Files.dmaTable $offsets
 
     # BPS PATCHING #
     if ($GameType -eq "Ocarina of Time") {
         if (CheckCheckBox -CheckBox $MMModelsOoT)                { & $Files.flips --ignore-checksum $Files.bpspatch_oot_models_mm $DecompressedROMFile | Out-Host }
         if (CheckCheckBox -CheckBox $WidescreenBackgroundsOoT)   { & $Files.flips --ignore-checksum $Files.bpspatch_oot_widescreen $DecompressedROMFile | Out-Host }
+        [System.GC]::Collect() | Out-Null
     }
 
     # BYTE PATCHING #
@@ -1061,6 +1154,9 @@ function PatchRedux() {
     if ($GameType -eq "Ocarina of Time")     { $ByteArray = PatchReduxOoT -ByteArray $ByteArray }
     elseif ($GameType -eq "Majora's Mask")   { $ByteArray = PatchReduxMM -ByteArray $ByteArray }
     [io.file]::WriteAllBytes($DecompressedROMFile, $ByteArray)
+
+    $ByteArray = $null
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -1614,11 +1710,14 @@ function PatchReduxMM($ByteArray) {
 #==============================================================================================================================================================================================
 function ExtendROM() {
     
-    if ($GameType -eq "Majora's Mask") {
-        $Bytes = @(08, 00, 00, 00)
-        $ByteArray = [IO.File]::ReadAllBytes($ROMFile)
-        [io.file]::WriteAllBytes($ROMFile, $Bytes + $ByteArray)
-    }
+    if ($GameType -ne "Majora's Mask") { return }
+
+    $Bytes = @(08, 00, 00, 00)
+    $ByteArray = [IO.File]::ReadAllBytes($ROMFile)
+    [io.file]::WriteAllBytes($ROMFile, $Bytes + $ByteArray)
+
+    $ByteArray = $null
+    [System.GC]::Collect() | Out-Null
 
 }
 
@@ -1638,18 +1737,10 @@ function CheckGameID() {
     
     $CompareArray = $null
 
-    if ($GameType -eq "Ocarina of Time") {
-        $CompareArray = @(78, 65, 67, 69)
-    }
-    elseif ($GameType -eq "Majora's Mask") {
-        $CompareArray = @(78, 65, 82, 69)
-    }
-    elseif ($GameType -eq "Super Mario 64") {
-        $CompareArray = @(78, 65, 65, 69)
-    }
-    elseif ($GameType -eq "Paper Mario 64") {
-        $CompareArray = @(78, 65, 69, 69)
-    }
+    if ($GameType -eq "Ocarina of Time")      { $CompareArray = @(78, 65, 67, 69) }
+    elseif ($GameType -eq "Majora's Mask")    { $CompareArray = @(78, 65, 82, 69) }
+    elseif ($GameType -eq "Super Mario 64")   { $CompareArray = @(78, 65, 65, 69) }
+    elseif ($GameType -eq "Paper Mario 64")   { $CompareArray = @(78, 65, 69, 69) }
 
     $CompareAgainst = $ByteArray[400..(403)]
 
@@ -1664,6 +1755,10 @@ function CheckGameID() {
         }
     }
 
+    $CompareArray = $null
+    $CompareAgainst = $null
+    [System.GC]::Collect() | Out-Null
+
     return $True
 
 }
@@ -1673,9 +1768,9 @@ function CheckGameID() {
 #==============================================================================================================================================================================================
 function SetCustomGameID() {
     
-    if (!$InputCustomGameIDCheckbox.Checked -and !$IsWiiVC)                           { return }
-    if ($InputCustomGameIDTextbox.TextLength -eq 4)                                   { $global:GameID = $InputCustomGameIDTextBox.Text }
-    if ($InputCustomChannelTitleTextBox.TextLength -gt 0 -and $GameType -ne "Free")   { $global:ChannelTitle = $InputCustomChannelTitleTextBox.Text }
+    if (!$InputCustomGameIDCheckbox.Checked -or !$IsWiiVC)                                   { return }
+    if ($InputCustomGameIDTextbox.TextLength -eq 4)                                          { $global:GameID = $InputCustomGameIDTextBox.Text }
+    if ($InputCustomChannelTitleTextBox.TextLength -gt 0 -and $global:GameType -ne "Free")   { $global:ChannelTitle = $InputCustomChannelTitleTextBox.Text }
 
 }
 
@@ -1921,7 +2016,7 @@ function RepackWADFile() {
     Push-Location $WiiVCPath
 
     # Repack the WAD using the new files.
-    & $Files.wadpacker $tik $tmd $cert $WadFile.Patched '-sign' '-i' $GameID
+    & $Files.wadpacker $tik $tmd $cert $WadFile.Patched '-sign' '-i' $global:GameID
 
     # If the patched file was created.
     if (TestPath -LiteralPath $WadFile.Patched) {
@@ -2208,7 +2303,7 @@ function CreateMainDialog() {
     $MainDialog.StartPosition = "CenterScreen"
     $MainDialog.KeyPreview = $true
     $MainDialog.Add_Shown({ $MainDialog.Activate() })
-    $MainDialog.Icon = $Icons.V
+    $MainDialog.Icon = $Icons.Main
 
     # Create ToolTip
     $ToolTip = CreateToolTip
@@ -2364,7 +2459,7 @@ function CreateMainDialog() {
 
     # Create a button to allow patching the WAD (OoT Redux).
     $global:PatchOoTReduxButton = CreateButton -X 75 -Y 30 -Width 100 -Height 35 -Text "OoT Redux" -ToolTip $ToolTip -Info "A romhack that improves mechanics for Ocarina of Time`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports rev0 US ROM File only" -AddTo $PatchOoTReduxGroup
-    $PatchOoTReduxButton.Add_Click({ MainFunctionOoTRedux -Command "Downgrade" -Hash $HashSum_oot_rev0 -Compress $True })
+    $PatchOoTReduxButton.Add_Click({ MainFunctionOoTRedux -Command "Downgrade" -Hash $HashSum_oot_rev0 -Compress $False })
 
     # Create a button to select additional Redux options.
     $global:PatchOoTReduxOptionsButton = CreateButton -X $PatchOoTReduxButton.Right -Y 30 -Width 40 -Height 35 -Text "+" -ToolTip $ToolTip -Info "Toggle additional features for the Ocarina of Time REDUX romhack" -AddTo $PatchOoTReduxGroup
@@ -2386,11 +2481,11 @@ function CreateMainDialog() {
 
     # Create a button to allow patching the WAD (OoT Spanish).
     $global:PatchOoTSpaButton = CreateButton -X 50 -Y 30 -Width 100 -Height 35 -Text "Spanish Translation" -ToolTip $ToolTip -Info "Spanish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
-    $PatchOoTSpaButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACS" -Title "Zelda: Ocarina (SPA)" -Patch $Files.bpspatch_oot_spa -PatchedFile "_spanish_patched" -Hash $HashSum_oot_rev0 -Compress $True })
+    $PatchOoTSpaButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACS" -Title "Zelda: Ocarina (SPA)" -Patch $Files.bpspatch_oot_spa -PatchedFile "_spanish_patched" -Hash $HashSum_oot_rev0 -Compress $False })
 
     # Create a button to allow patching the WAD (OoT Polish).
     $global:PatchOoTPolButton = CreateButton -X ($PatchOoTSpaButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Polish Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
-    $PatchOoTPolButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACO" -Title "Zelda: Ocarina (POL)" -Patch $Files.bpspatch_oot_pol -PatchedFile "_polish_patched" -Hash $HashSum_oot_rev0 -Compress $True })
+    $PatchOoTPolButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACO" -Title "Zelda: Ocarina (POL)" -Patch $Files.bpspatch_oot_pol -PatchedFile "_polish_patched" -Hash $HashSum_oot_rev0 -Compress $False })
 
     # Create a button to allow patching the WAD (OoT Russian).
     $global:PatchOoTRusButton = CreateButton -X ($PatchOoTPolButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Russian Translation" -ToolTip $ToolTip -Info "Russian Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
@@ -2398,7 +2493,7 @@ function CreateMainDialog() {
 
     # Create a button to allow patching the WAD (OoT Chinese Simplified).
     $global:PatchOoTChiButton = CreateButton -X ($PatchOoTRusButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Chinese Translation" -ToolTip $ToolTip -Info "Chinese Fan-Translation of Ocarina of Time`nSupports rev0 US ROM File only" -AddTo $PatchOoTTranslationGroup
-    $PatchOoTChiButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACC" -Title "Zelda: Ocarina (CHI)" -Patch $Files.bpspatch_oot_chi -PatchedFile "_chinese_patched" -Hash $HashSum_oot_rev0 -Compress $True })
+    $PatchOoTChiButton.Add_Click({ MainFunctionPatch -Command "Downgrade" -Id "NACC" -Title "Zelda: Ocarina (CHI)" -Patch $Files.bpspatch_oot_chi -PatchedFile "_chinese_patched" -Hash $HashSum_oot_rev0 -Compress $False })
 
 
 
@@ -2414,7 +2509,7 @@ function CreateMainDialog() {
 
     # Create a button to allow patching the WAD (MM Redux).
     $global:PatchMMReduxButton = CreateButton -X 75 -Y 30 -Width 100 -Height 35 -Text "MM Redux" -ToolTip $ToolTip -Info "A romhack that improves mechanics for Majorea's Mask`nIt includes the use of the D-Pad for additional dedicated item buttons`nSupports US ROM File only" -AddTo $PatchMMReduxGroup
-    $PatchMMReduxButton.Add_Click({ MainFunctionMMRedux -Command $null -Hash $HashSum_mm -Compress $True })
+    $PatchMMReduxButton.Add_Click({ MainFunctionMMRedux -Command $null -Hash $HashSum_mm -Compress $False })
 
     # Create a button to select additional Redux options.
     $global:PatchMMReduxOptionsButton = CreateButton -X $PatchMMReduxButton.Right -Y 30 -Width 40 -Height 35 -Text "+" -ToolTip $ToolTip -Info "Toggle additional features for the Majora's Mask REDUX romhack" -AddTo $PatchMMReduxGroup
@@ -2433,7 +2528,7 @@ function CreateMainDialog() {
     # Create a button to allow patching the WAD (MM Polish).
     $global:PatchMMPolButton = CreateButton -X 180 -Y 30 -Width 100 -Height 35 -Text "Polish Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only" -AddTo $PatchMMTranslationGroup
     $PatchMMPolButton.Size = New-Object System.Drawing.Size(100, 35)
-    $PatchMMPolButton.Add_Click({ MainFunctionPatch -Command $null -Id "NARO" -Title "Zelda: Majora's (POL)" -Patch $Files.bpspatch_mm_pol -PatchedFile "_polish_patched" -Hash $HashSum_mm_ -Compress $True })
+    $PatchMMPolButton.Add_Click({ MainFunctionPatch -Command $null -Id "NARO" -Title "Zelda: Majora's (POL)" -Patch $Files.bpspatch_mm_pol -PatchedFile "_polish_patched" -Hash $HashSum_mm -Compress $False })
 
     # Create a button to allow patching the WAD (MM Russian).
     $global:PatchMMRusButton = CreateButton -X ($PatchMMPolButton.Right + 30) -Y 30 -Width 100 -Height 35 -Text "Russian Translation" -ToolTip $ToolTip -Info "Polish Fan-Translation of Majora's Mask`nSupports US ROM File only" -AddTo $PatchMMTranslationGroup
@@ -2872,10 +2967,80 @@ function CheckCheckBox([Object]$CheckBox) {
 
 
 #==============================================================================================================================================================================================
+function CheckReduxOptions() {
+    
+    if ($GameType -eq "Ocarina of Time") {
+
+        if ($2xDamageOoT.Checked)                                 { return $True }
+        if ($4xDamageOoT.Checked)                                 { return $True }
+        if ($8xDamageOoT.Checked)                                 { return $True }
+
+        if ($HalfRecoveryOoT.Checked)                             { return $True }
+        if ($QuarterRecoveryOoT.Checked)                          { return $True }
+        if ($NoRecoveryOoT.Checked)                               { return $True }
+
+        if ($1xTextOoT.Checked -and $IncludeReduxOoT.Checked)     { return $True }
+        if ($2xTextOoT.Checked -and !$IncludeReduxOoT.Checked)    { return $True }
+        if ($3xTextOoT.Checked)                                   { return $True }
+
+        if ($WidescreenOoT.Checked)                               { return $True }
+        if ($WidescreenBackgroundsOoT.Checked)                    { return $True }
+        if ($ExtendedDrawOoT.Checked)                             { return $True }
+        if ($BlackBarsOoT.Checked)                                { return $True }
+        if ($ForceHiresModelOoT.Checked)                          { return $True }
+        if ($MMModelsOoT.Checked -and $IncludeReduxOoT.Checked)   { return $True }
+
+        if ($ReducedItemCapacityOoT.Checked)                      { return $True }
+        if ($IncreasedItemCapacityOoT.Checked)                    { return $True }
+        if ($UnlockSwordOoT.Checked)                              { return $True }
+        if ($UnlockTunicsOoT.Checked)                             { return $True }
+        if ($UnlockBootsOoT.Checked)                              { return $True }
+
+        if ($DisableLowHPSoundOoT.Checked)                        { return $True }
+        if ($MedallionsOoT.Checked)                               { return $True }
+        if ($ReturnChildOoT.Checked)                              { return $True }
+        if ($DisableNaviOoT.Checked)                              { return $True }
+        if ($HideDPadOoT.Checked -and $IncludeReduxOoT.Checked)   { return $True }
+
+    }
+
+    elseif ($GameType -eq "Majora's Mask") {
+        
+        if ($2xDamageMM.Checked)                                 { return $True }
+        if ($4xDamageMM.Checked)                                 { return $True }
+        if ($8xDamageMM.Checked)                                 { return $True }
+
+        if ($HalfRecoveryMM.Checked)                             { return $True }
+        if ($QuarterRecoveryMM.Checked)                          { return $True }
+        if ($NoRecoveryMM.Checked)                               { return $True }
+        if ($LeftDPadMM.Checked -and $IncludeReduxMM.Checked)    { return $True }
+        if ($HideDPadMM.Checked -and $IncludeReduxMM.Checked)    { return $True }
+
+        if ($WidescreenMM.Checked)                               { return $True }
+        if ($ExtendedDrawMM.Checked)                             { return $True }
+        if ($BlackBarsMM.Checked)                                { return $True }
+        if ($PixelatedStarsMM.Checked)                           { return $True }
+
+        if ($ReducedItemCapacityMM.Checked)                      { return $True }
+        if ($IncreasedItemCapacityMM.Checked)                    { return $True }
+        if ($RazorSwordMM.Checked)                               { return $True }
+
+        if ($DisableLowHPSoundMM.Checked)                        { return $True }
+        if ($PieceOfHeartSoundMM.Checked)                        { return $True }
+
+    }
+
+    return $False
+
+}
+
+
+
+#==============================================================================================================================================================================================
 function CreateOcarinaOfTimeReduxOptionsDialog() {
 
     # Create Dialog
-    $global:OoTReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $Icons.Zelda1
+    $global:OoTReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $Icons.OcarinaOfTimeRedux
     $CloseButton = CreateButton -X ($OoTReduxOptionsDialog.Width / 2 - 40) -Y ($OoTReduxOptionsDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $OoTReduxOptionsDialog
     $CloseButton.Add_Click({$OoTReduxOptionsDialog.Hide()})
 
@@ -2979,7 +3144,7 @@ function CreateOcarinaOfTimeReduxOptionsDialog() {
 function CreateMajorasMaskReduxOptionsDialog() {
     
     # Create Dialog
-    $global:MMReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $Icons.Zelda2
+    $global:MMReduxOptionsDialog = CreateDialog -Width 700 -Height 580 -Icon $Icons.MajorasMaskRedux
     $CloseButton = CreateButton -X ($MMReduxOptionsDialog.Width / 2 - 40) -Y ($MMReduxOptionsDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $MMReduxOptionsDialog
     $CloseButton.Add_Click({$MMReduxOptionsDialog.Hide()})
 
@@ -3077,7 +3242,7 @@ function CreateMajorasMaskReduxOptionsDialog() {
 function CreateInfoGameIDDialog() {
     
     # Create Dialog
-    $global:InfoGameIDDialog = CreateDialog -Width 400 -Height 560 -Icon $Icons.Mario1
+    $global:InfoGameIDDialog = CreateDialog -Width 400 -Height 560 -Icon $Icons.CheckGameID
     $CloseButton = CreateButton -X ($InfoGameIDDialog.Width / 2 - 40) -Y ($InfoGameIDDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoGameIDDialog
     $CloseButton.Add_Click({$InfoGameIDDialog.Hide()})
 
@@ -3138,7 +3303,7 @@ function CreateInfoGameIDDialog() {
 function CreateInfoOcarinaOfTimeDialog() {
     
     # Create Dialog
-    $global:InfoOcarinaOfTimeDialog = CreateDialog -Width 400 -Height 510 -Icon $Icons.Zelda2
+    $global:InfoOcarinaOfTimeDialog = CreateDialog -Width 400 -Height 510 -Icon $Icons.OcarinaOfTime
     $CloseButton = CreateButton -X ($InfoOcarinaOfTimeDialog.Width / 2 - 40) -Y ($InfoOcarinaOfTimeDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoOcarinaOfTimeDialog
     $CloseButton.Add_Click({$InfoOcarinaOfTimeDialog.Hide()})
 
@@ -3195,7 +3360,7 @@ function CreateInfoOcarinaOfTimeDialog() {
 function CreateInfoMajorasMaskDialog() {
     
     # Create Dialog
-    $global:InfoMajorasMaskDialog = CreateDialog -Width 400 -Height 540 -Icon $Icons.Zelda2
+    $global:InfoMajorasMaskDialog = CreateDialog -Width 400 -Height 540 -Icon $Icons.MajorasMask
     $CloseButton = CreateButton -X ($InfoOcarinaOfTimeDialog.Width / 2 - 40) -Y ($InfoMajorasMaskDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoMajorasMaskDialog
     $CloseButton.Add_Click({$InfoMajorasMaskDialog.Hide()})
 
@@ -3254,7 +3419,7 @@ function CreateInfoMajorasMaskDialog() {
 function CreateInfoSuperMario64Dialog() {
     
     # Create Dialog
-    $global:InfoSuperMario64Dialog = CreateDialog -Width 400 -Height 500 -Icon $Icons.Mario1
+    $global:InfoSuperMario64Dialog = CreateDialog -Width 400 -Height 500 -Icon $Icons.SuperMario64
     $CloseButton = CreateButton -X ($InfoSuperMario64Dialog.Width / 2 - 40) -Y ($InfoSuperMario64Dialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoSuperMario64Dialog
     $CloseButton.Add_Click({$InfoSuperMario64Dialog.Hide()})
 
@@ -3309,7 +3474,7 @@ function CreateInfoSuperMario64Dialog() {
 function CreateInfoPaperMarioDialog() {
     
      # Create Dialog
-    $global:InfoPaperMarioDialog = CreateDialog -Width 400 -Height 460 -Icon $Icons.Mario2
+    $global:InfoPaperMarioDialog = CreateDialog -Width 400 -Height 460 -Icon $Icons.PaperMario
     $CloseButton = CreateButton -X ($InfoPaperMarioDialog.Width / 2 - 40) -Y ($InfoPaperMarioDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoPaperMarioDialog
     $CloseButton.Add_Click({$InfoPaperMarioDialog.Hide()})
 
@@ -3361,7 +3526,7 @@ function CreateInfoPaperMarioDialog() {
 function CreateInfoFreeDialog() {
     
     # Create Dialog
-    $global:InfoFreeDialog = CreateDialog -Width 400 -Height 410 -Icon $Icons.V
+    $global:InfoFreeDialog = CreateDialog -Width 400 -Height 410 -Icon $Icons.Free
     $CloseButton = CreateButton -X ($InfoFreeDialog.Width / 2 - 40) -Y ($InfoFreeDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $InfoFreeDialog
     $CloseButton.Add_Click({$InfoFreeDialog.Hide()})
 
@@ -3410,7 +3575,7 @@ function CreateInfoFreeDialog() {
 function CreateCreditsDialog() {
     
     # Create Dialog
-    $global:CreditsDialog = CreateDialog -Width 760 -Height 470 -Icon $Icons.Zelda3
+    $global:CreditsDialog = CreateDialog -Width 760 -Height 470 -Icon $Icons.Credits
     $CloseButton = CreateButton -X ($CreditsDialog.Width / 2 - 40) -Y ($CreditsDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $CreditsDialog
     $CloseButton.Add_Click({$CreditsDialog.Hide()})
 
@@ -3495,6 +3660,32 @@ function CreateCreditsDialog() {
     #Create Label
     $String = [String]::Format($String, [Environment]::NewLine)
     $RightLabel = CreateLabel -X $LeftLabel.Right -Y ($InfoLabel.Bottom + 15) -Width 370 -Height ($CreditsDialog.Height - 110) -Text $String -AddTo $CreditsDialog
+
+}
+
+
+
+#==============================================================================================================================================================================================
+function CreateMissingFilesDialog() {
+    
+    # Create Dialog
+    $global:MissingFilesDialog = CreateDialog -Width 300 -Height 200 -Icon $null
+
+    $CloseButton = CreateButton -X ($MissingFilesDialog.Width / 2 - 40) -Y ($MissingFilesDialog.Height - 90) -Width 80 -Height 35 -Text "Close" -AddTo $MissingFilesDialog
+    $CloseButton.Add_Click({$MissingFilesDialog.Hide()})
+
+    # Create the string that will be displayed on the window.
+    $String = $ScriptName + " (" + $Version + ")" + "{0}"
+
+    $String += "{0}"
+    $String += "Neccessary files are missing.{0}"
+    $String += "{0}"
+    $String += "Please download the Patcher64+ Tool again."
+
+    $String = [String]::Format($String, [Environment]::NewLine)
+
+    #Create Label
+    $Label = CreateLabel -X 10 -Y 10 -Width ($MissingFilesDialog.Width-10) -Height ($MissingFilesDialog.Height - 110) -Text $String -AddTo $MissingFilesDialog
 
 }
 
@@ -3639,10 +3830,20 @@ function CreateReduxCheckbox([int]$Column, [int]$Row, [Object]$ToolTip, [Object]
 
 # Hide the PowerShell console from the user.
 ShowPowerShellConsole -ShowConsole $False
-[System.GC]::Collect()
+[System.GC]::Collect() | Out-Null
 
 # Find icons
 $global:Icons = SetIconParameters
+
+# Set paths to all the files stored in the script.
+$global:Files = SetFileParameters
+
+# Files are missing, error!
+if ($MissingFiles) {
+    CreateMissingFilesDialog
+    $MissingFilesDialog.ShowDialog() | Out-Null
+    Exit
+}
 
 # Create the dialogs to show to the user.
 CreateMainDialog

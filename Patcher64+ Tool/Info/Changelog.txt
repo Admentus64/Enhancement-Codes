@@ -1,3 +1,15 @@
+06-06-2020
+- Reduced and optimized CPU and RAM usage
+- Optimized patching process
+- Added additional warnings
+- Each dialog window now holds it's own icon, through still duplicates for now...
+- Included a compiled .exe
+- Most patches are now applied on compressed ROM files again
+- Fixed the Polish Translation for Majora's Mask not passing the hashsum check
+- Fixed patches other than REDUX being broken... Again...
+- Fixed patches not having their assigned GameID
+- Added missing files check
+
 05-06-2020
 - Changed Main GUI
 - Fixed patching... Again...
