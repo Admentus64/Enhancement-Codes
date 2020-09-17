@@ -3,11 +3,14 @@
 ------------------------------
 
 - Enable the option: "Active Cheats" in the General Config menu.
-- Ocarina of Time has three versions of each region: Virtual Console, Collector's Edition Disc and Master Quest Disc.
-- Majora's Mask has two versions of each region: Virtual Console and Collector's Edition.
-- Only two regions are supported: PAL and NTSC-U. NTSC-U has the main priority and focus.
+- Only enable cheats for one game at a time.
+- Ocarina of Time and Majora's Mask are two different games (Collector's Edition disc).
+- Ocarina of Time and Master Quest are two different games (Master Quest disc).
+- Keep the GameCube language set at English if using the PAL disc (PZLP01, D43P01). Instead use an AR Code to force or select the language you prefer. This allows AR Codes to working on multiple languages.
+- Univeral codes may be used regardless of your used game.
 - Cheats are placed into My Documents/Dolphin Emulators/GameSettings/GameID.ini, where GameID is the GameID of the game (such as PZLE01, D43E01).
-- Set CPU Clock Override for Ocarina of Time to 250%, Master Quest to 250% and Majora's Mask to 295% (respective Game ini files automatically adjust set the CPU Clock Override.
+- Set CPU Clock Override for Ocarina of Time and Master Quest to 250% and Majora's Mask to 295% (settings below automatically set the CPU Clock Override to 295%) when using the GameCube discs
+- Set CPU Clock Override for Ocarina of Time and Master Quest to 175% and Majora's Mask to 200% when using the Virtual Console versions
 
 
 ------------------------------------
@@ -25,4 +28,5 @@
 --- Future Additions ---
 ------------------------
 
-- Backporting codes to PAL versions
+- Backporting codes to PAL version (D43P01).
+- Add more codes to Ocarina of Time REDUX (NAC001)
