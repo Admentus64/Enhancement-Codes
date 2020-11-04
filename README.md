@@ -16,7 +16,7 @@ Ex. PZLE01 is the US game disc "The Legend of Zelda: Collector's Edition".
 
 Manual:
 1. Open Dolphin
-2 Right-click your game in Dolphin's game list
+2. Right-click your game in Dolphin's game list
 3. Click on Properties
 4. Go to the Editor tab
 5. Copy all content from the downloaded .ini and paste it into the User Configuration section (make sure to clear it first)
