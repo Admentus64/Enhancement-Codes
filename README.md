@@ -24,10 +24,10 @@ Manual:
 In order to use AR and Gecko Codes, make sure that the "Activate Cheats" option is enabled in Dolphin's General Config.
 
 Dolphin threads that contains codes (in case you did not download them already):
-Super Mario 64: https://forums.dolphin-emu.org/Thread-super-mario-64-hd-texture-pack-v1-5-2017-09-17
-Super Smash Bros.: https://forums.dolphin-emu.org/Thread-super-smash-brothers-hd-texture-pack-v1-0-1-2017-09-06
-Zelda 64: https://forums.dolphin-emu.org/Thread-ar-codes-for-ocarina-of-time-master-quest-majora-s-mask
-AR Coding with Admentus: https://forums.dolphin-emu.org/Thread-ar-coding-with-admentus
+- Super Mario 64: https://forums.dolphin-emu.org/Thread-super-mario-64-hd-texture-pack-v1-5-2017-09-17
+- Super Smash Bros.: https://forums.dolphin-emu.org/Thread-super-smash-brothers-hd-texture-pack-v1-0-1-2017-09-06
+- Zelda 64: https://forums.dolphin-emu.org/Thread-ar-codes-for-ocarina-of-time-master-quest-majora-s-mask
+- AR Coding with Admentus: https://forums.dolphin-emu.org/Thread-ar-coding-with-admentus
 
 
 
