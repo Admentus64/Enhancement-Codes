@@ -6,3 +6,5 @@ This ensures compatability with both Redux and Vanilla Ocarina of Time while usi
 Redux is NOT required as Action Replay code will still work without it.
 
 This only applies to the US (NTSC-U) version. EU (PAL) or JPN (NTSC-J) requires different codes.
+
+For more enhancements for the US version, check out the Patcher64+ Tool at: https://github.com/Admentus64/Patcher64Plus-Tool/releases.
