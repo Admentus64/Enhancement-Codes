@@ -1,6 +1,10 @@
 ⛔️ DEPRECATED ⛔️
 
+Use the Patcher64+ Tool instead: https://github.com/Admentus64/Patcher64Plus-Tool
 
+
+
+# ORIGINAL #
 
 --------------------------
 --- ENHANCEMENT CODES ----
